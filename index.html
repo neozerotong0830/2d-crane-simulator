@@ -1,0 +1,3679 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>工程吊機負載表與吊運模擬器 (Pro Edition)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Microsoft JhengHei", sans-serif;
+      background-color: #0b1120;
+      color: #f1f5f9;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    input[type="range"] {
+      accent-color: #f59e0b;
+    }
+    .blueprint-bg {
+      background-color: #091326;
+      background-image: 
+        linear-gradient(rgba(30, 58, 138, 0.22) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30, 58, 138, 0.22) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+    .matrix-cell:hover {
+      outline: 2px solid #f59e0b;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-amber-500 selection:text-slate-950">
+
+  <header class="bg-slate-900/95 border-b border-slate-800 px-4 py-2.5 sticky top-0 z-30 backdrop-blur">
+    <div class="max-w-[1640px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center text-slate-950 font-black text-lg shadow-lg shadow-amber-500/20">
+          ⛓️
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base md:text-lg font-bold tracking-tight text-white">CRANE LIFT &amp; LOAD CHART SIMULATOR</h1>
+            <span class="text-[10px] font-semibold uppercase px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40">Jib Geometry Pro</span>
+          </div>
+          <p class="text-[11px] text-slate-400">工程吊機負載表查詢・主/副臂(Jib)真實截面尺寸與雙重防撞空間幾何模擬系統</p>
+        </div>
+      </div>
+
+      <!-- Action Buttons & Quick Scenarios -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <button type="button" onclick="openCraneBuilderModal()" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-500/20">
+          <span>➕</span> 新增 / 管理吊機庫 (含 Jib 尺寸)
+        </button>
+
+        <button type="button" onclick="openLoadChartExplorer()" class="text-xs px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition flex items-center gap-1.5 shadow-md shadow-amber-500/20">
+          <span>📊</span> 查閱完整 Load Chart 總表
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-1 max-w-[1640px] w-full mx-auto p-3 md:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+    <!-- LEFT COLUMN: Crane & Rigging Controls (4 Cols) -->
+    <section class="lg:col-span-4 flex flex-col gap-3.5">
+
+      <!-- 1. Crane Model & Configuration -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-4 bg-amber-500 rounded-sm"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">1. 吊機型號與配置 (Crane Setup)</h2>
+          </div>
+          <span id="craneTypeBadge" class="text-[11px] mono text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/30">Crawler Crane</span>
+        </div>
+
+        <div class="space-y-3">
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">品牌 (Brand)</label>
+              <select id="brandSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 transition"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">型號 (Model)</label>
+              <select id="craneSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 transition"></select>
+            </div>
+          </div>
+
+          <!-- Main Boom & Counterweight Row -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">主臂長度 (Main Boom)</label>
+              <select id="mainBoomSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white mono focus:outline-none focus:border-amber-500"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">配重 (Counterweight)</label>
+              <select id="cwSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white mono focus:outline-none focus:border-amber-500"></select>
+            </div>
+          </div>
+
+          <!-- Jib Length & Jib Offset Angle Row -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">副臂長度 (Fly / Fixed Jib)</label>
+              <select id="jibSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white mono focus:outline-none focus:border-amber-500"></select>
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">副臂安裝傾角 (Jib Offset)</label>
+              <select id="jibOffsetSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white mono focus:outline-none focus:border-amber-500"></select>
+            </div>
+          </div>
+
+          <!-- Hook Block Selection -->
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">吊鈎類型 (Hook Block Type &amp; Weight)</label>
+            <select id="hookSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white mono focus:outline-none focus:border-amber-500"></select>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Working Radius & Hoist Position -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-4 bg-cyan-500 rounded-sm"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">2. 工作半徑與吊升高度 (Radius &amp; Hoist)</h2>
+          </div>
+          <span class="text-[11px] text-slate-400">可直接在右側圖中拖曳貨物</span>
+        </div>
+
+        <div class="space-y-3.5">
+          <!-- Working Radius Slider -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-300 font-medium">工作半徑 (Working Radius)</span>
+              <div class="flex items-center gap-1">
+                <input id="radiusNum" type="number" step="0.5" min="3" max="80" class="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-right text-amber-400 font-bold mono text-xs">
+                <span class="text-slate-400 mono text-xs">m</span>
+              </div>
+            </div>
+            <input id="radiusSlider" type="range" min="3" max="64" step="0.5" value="18" class="w-full cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-500 mono mt-0.5">
+              <span id="minRadiusLabel">Min: 3.5m</span>
+              <span id="currentAngleLabel" class="text-cyan-400">主臂仰角: --°</span>
+              <span id="maxRadiusLabel">Max: 50.0m</span>
+            </div>
+          </div>
+
+          <!-- Load Bottom Elevation / Hook Height Slider -->
+          <div>
+            <div class="flex justify-between text-xs mb-1">
+              <span class="text-slate-300 font-medium">貨物底部離地高度 (Load Elevation)</span>
+              <div class="flex items-center gap-1">
+                <input id="loadHeightNum" type="number" step="0.5" min="0" max="90" class="w-16 bg-slate-950 border border-slate-700 rounded px-1.5 py-0.5 text-right text-cyan-400 font-bold mono text-xs">
+                <span class="text-slate-400 mono text-xs">m</span>
+              </div>
+            </div>
+            <input id="loadHeightSlider" type="range" min="0" max="60" step="0.5" value="20" class="w-full cursor-pointer">
+            <div class="flex justify-between text-[10px] text-slate-500 mono mt-0.5">
+              <span>地面 (0.0m)</span>
+              <span id="hookHeightLabel" class="text-slate-300">吊鈎高度: --m</span>
+              <span id="maxLiftHeightLabel">滑輪高度: --m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Load Dimensions & Rigging / Slings -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg">
+        <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-4 bg-emerald-500 rounded-sm"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">3. 吊運物件尺寸及吊索設定 (Load &amp; Rigging)</h2>
+          </div>
+          <span class="text-[11px] mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">防撞幾何計算</span>
+        </div>
+
+        <div class="space-y-3">
+          <!-- Load L x W x H -->
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">長度 Length (m)</label>
+              <input id="loadLength" type="number" min="0.5" max="30" step="0.1" value="5.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">闊度 Width (m)</label>
+              <input id="loadWidth" type="number" min="0.5" max="30" step="0.1" value="3.0" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">高度 Height (m)</label>
+              <input id="loadHeightDim" type="number" min="0.5" max="25" step="0.1" value="3.2" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Orientation & Load Weight -->
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">2D 側面剖視顯示的水平尺寸</label>
+              <select id="loadOrientation" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none">
+                <option value="length">顯示長度 Length（沿工作半徑）</option>
+                <option value="width">顯示闊度 Width（沿工作半徑）</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">貨物淨重 (Load Weight, t)</label>
+              <input id="loadWeight" type="number" min="0.1" max="300" step="0.1" value="6.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-amber-400 font-bold mono focus:border-amber-500 focus:outline-none">
+            </div>
+          </div>
+
+          <!-- Sling Input Mode & Parameters -->
+          <div class="pt-2 border-t border-slate-800/80">
+            <div class="flex items-center justify-between mb-2">
+              <label class="text-xs text-slate-300 font-medium">吊具 / 吊索設定 (Sling Geometry)</label>
+              <div class="inline-flex rounded-md bg-slate-950 p-0.5 border border-slate-800 text-[11px]">
+                <button type="button" id="modeSlingLengthBtn" onclick="setSlingMode('length')" class="px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-semibold transition">依吊索長度</button>
+                <button type="button" id="modeSlingAngleBtn" onclick="setSlingMode('angle')" class="px-2 py-0.5 rounded text-slate-400 hover:text-white transition">依對角夾角</button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mb-2">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">吊索腿數</label>
+                <select id="slingLegsSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none">
+                  <option value="1">1 腿（單鈎）</option>
+                  <option value="2" selected>2 腿</option>
+                  <option value="3">3 腿</option>
+                  <option value="4">4 腿（按 2 腿計載）</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">吊樑</label>
+                <select id="beamTypeSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:border-amber-500 focus:outline-none">
+                  <option value="none" selected>無吊樑</option>
+                  <option value="spreader">Spreader（上斜索 + 下直索）</option>
+                  <option value="lifting">Lifting beam（中吊 + 下索）</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div id="slingLengthBox">
+                <label id="slingLengthLabel" class="block text-[11px] text-slate-400 mb-1">吊索長度 (m)</label>
+                <input id="slingLengthInput" type="number" min="0.6" max="25" step="0.2" value="5.0" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+              <div id="slingAngleBox" class="opacity-60">
+                <label class="block text-[11px] text-slate-400 mb-1">對角夾角 (°)</label>
+                <input id="slingAngleInput" type="number" min="0" max="150" step="1" value="60" disabled class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">吊點內縮 (m)</label>
+                <input id="lugInsetInput" type="number" min="0" max="10" step="0.1" value="0" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+            </div>
+
+            <div id="beamFields" class="hidden grid grid-cols-3 gap-2 mt-2">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">吊樑長度 (m)</label>
+                <input id="beamLengthInput" type="number" min="0.8" max="30" step="0.1" value="5.5" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">吊樑截面高 (m)</label>
+                <input id="beamDepthInput" type="number" min="0.15" max="2" step="0.05" value="0.35" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label id="secondarySlingLabel" class="block text-[11px] text-slate-400 mb-1">下索 / 吊桿長 (m)</label>
+                <input id="secondarySlingInput" type="number" min="0.3" max="20" step="0.1" value="1.2" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 mt-2">
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">吊具/索具重 (t，含吊樑)</label>
+                <input id="riggingWeightInput" type="number" min="0" max="20" step="0.1" value="0.4" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400 mb-1">單腿 WLL (t，可留空)</label>
+                <input id="slingWllInput" type="number" min="0" max="200" step="0.1" value="" placeholder="不檢查" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-sm text-white mono focus:border-amber-500 focus:outline-none">
+              </div>
+            </div>
+
+            <div class="mt-2.5 px-3 py-2 rounded-lg bg-slate-950/90 border border-slate-800/90 text-[11px] mono space-y-1">
+              <div class="flex items-center justify-between gap-2">
+                <span id="slingVerticalHeightText" class="text-slate-300">吊索垂直高度: 4.0m</span>
+                <span id="slingApexAngleText" class="text-cyan-400">對角 60° | 單腿 0.00t</span>
+              </div>
+              <div id="slingCodeText" class="text-slate-400">EN -- | 角度 --</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <section class="lg:col-span-8 flex flex-col gap-3.5">
+
+      <!-- Top Status Verdict Banner & KPI Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-12 gap-3">
+        <!-- Main Safety Verdict Banner -->
+        <div id="verdictBanner" class="md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 transition-all bg-emerald-950/50 border-emerald-600/60">
+          <div id="verdictIcon" class="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+            ✅
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span id="verdictBadge" class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500 text-slate-950">SAFE TO LIFT</span>
+              <span id="verdictSubTag" class="text-xs text-emerald-300 font-medium truncate">可安全吊運・無碰撞風險</span>
+            </div>
+            <p id="verdictDetail" class="text-xs text-slate-300 mt-1 leading-relaxed">
+              負載率 68.2%，貨物與主臂/副臂最小淨空 3.45m (安全標準 ≥ 1.0m)。
+            </p>
+          </div>
+        </div>
+
+        <!-- KPI Metrics (7 cols) -->
+        <div class="md:col-span-7 grid grid-cols-3 gap-2.5">
+          <!-- Metric 1: Total Deducted Load vs Rated Capacity -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>總吊重 vs 額定吊重</span>
+              <span class="mono text-[10px] text-slate-500">GROSS / SWL</span>
+            </div>
+            <div class="my-1 flex items-baseline gap-1.5 mono">
+              <span id="kpiTotalLoad" class="text-lg md:text-xl font-bold text-white">7.3</span>
+              <span class="text-xs text-slate-400">/</span>
+              <span id="kpiRatedCap" class="text-base font-semibold text-amber-400">11.0 t</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mono truncate" id="kpiNetBreakdown">
+              含貨物 6.5t + 鈎 0.4t + 索 0.4t
+            </div>
+          </div>
+
+          <!-- Metric 2: Load Percentage Bar -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>吊機負載率 (LMI)</span>
+              <span id="kpiUtilStatus" class="mono text-[10px] text-emerald-400 font-semibold">OK</span>
+            </div>
+            <div class="my-1 flex items-baseline justify-between mono">
+              <span id="kpiUtilization" class="text-lg md:text-xl font-bold text-emerald-400">66.4%</span>
+              <span id="kpiNetMargin" class="text-[11px] text-slate-400">餘裕 +3.7t</span>
+            </div>
+            <div class="w-full h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+              <div id="kpiUtilBar" class="h-full bg-emerald-500 transition-all duration-200" style="width: 66%"></div>
+            </div>
+          </div>
+
+          <!-- Metric 3: Dual Boom & Jib Clearance -->
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>主臂 / 副臂防撞淨空</span>
+              <span id="kpiClearanceBadge" class="mono text-[10px] text-emerald-400 font-semibold">CLEAR</span>
+            </div>
+            <div class="my-0.5 flex items-baseline gap-1.5 mono">
+              <span id="kpiClearanceVal" class="text-lg md:text-xl font-bold text-emerald-400">3.42 m</span>
+              <span id="kpiClosestPartTag" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300">最近: 副臂</span>
+            </div>
+            <div class="text-[10px] text-slate-400 mono flex items-center justify-between" id="kpiDualClearanceSub">
+              <span>主臂: 4.10m</span>
+              <span>副臂: 3.42m</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Interactive 2D Crane & Collision Graphic Canvas -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl flex flex-col">
+        <!-- Canvas Toolbar -->
+        <div class="px-4 py-2 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-4 flex-wrap">
+            <span class="font-semibold text-slate-200 flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+              2D 吊運空間及防撞 Jib 模擬圖
+            </span>
+            <span class="hidden lg:inline text-[11px] text-slate-500">拖曳貨物可改工作半徑與吊升高度</span>
+            <div class="hidden sm:flex items-center gap-3 text-[11px] text-slate-400">
+              <span class="flex items-center gap-1"><span class="w-3 h-2 inline-block bg-amber-500/80 border border-amber-300 rounded-sm"></span>主臂 (<span id="legendBoomDepth">1.66m</span>)</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-2 inline-block bg-sky-400/80 border border-sky-200 rounded-sm"></span>副臂 Jib (<span id="legendJibDepth">0.95m</span>)</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 inline-block bg-emerald-500/40 border border-emerald-400 rounded-sm"></span>貨物與吊索</span>
+              <span class="flex items-center gap-1"><span class="w-3 h-0.5 inline-block bg-rose-500"></span>最短防撞淨空線</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer select-none">
+              <input id="showEnvelopeToggle" type="checkbox" checked class="rounded accent-amber-500">
+              顯示吊臂軌跡與雙淨空線
+            </label>
+            <button type="button" onclick="resetView()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition">
+              重設視角
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="relative w-full h-[430px] md:h-[470px] blueprint-bg select-none overflow-hidden">
+          <canvas id="simCanvas" class="w-full h-full block cursor-crosshair"></canvas>
+
+          <!-- Floating Overlay Telemetry on Canvas -->
+          <div class="absolute top-3 right-3 bg-slate-950/90 border border-slate-800/90 backdrop-blur px-3 py-2.5 rounded-lg text-[11px] mono space-y-1 pointer-events-none shadow-lg">
+            <div class="text-amber-400 font-bold border-b border-slate-800 pb-1 mb-1 flex items-center justify-between gap-3">
+              <span id="overlayCraneName">Liebherr HS 885 HD</span>
+              <span id="overlayJibBadge" class="text-[10px] px-1.5 py-0.2 bg-sky-500/20 text-sky-300 rounded">Jib 20m</span>
+            </div>
+            <div class="flex justify-between gap-4"><span class="text-slate-400">Main 仰角:</span><span id="overlayMainAngle" class="text-amber-300">--°</span></div>
+            <div class="flex justify-between gap-4"><span class="text-slate-400">Jib 仰角:</span><span id="overlayJibAngle" class="text-sky-300">--°</span></div>
+            <div class="flex justify-between gap-4"><span class="text-slate-400">主臂頭高度 (Main Tip):</span><span id="overlayMainTipH" class="text-slate-200">-- m</span></div>
+            <div class="flex justify-between gap-4"><span class="text-slate-400">有效臂頭高度 (Sheave):</span><span id="overlayActiveTipH" class="text-white font-bold">-- m</span></div>
+            <div class="flex justify-between gap-4"><span class="text-slate-400">主臂/副臂截面高:</span><span id="overlaySectionDims" class="text-amber-300">1.66m / 0.95m</span></div>
+            <div class="flex justify-between gap-4"><span class="text-slate-400">吊具:</span><span id="overlayRigging" class="text-cyan-300">2 腿</span></div>
+            <div class="border-t border-slate-800/80 pt-1 mt-1 space-y-0.5">
+              <div class="flex justify-between gap-4"><span class="text-slate-400">離主臂最小淨空:</span><span id="overlayMainClearance" class="text-emerald-400 font-semibold">-- m</span></div>
+              <div class="flex justify-between gap-4"><span class="text-slate-400">離副臂(Jib)淨空:</span><span id="overlayJibClearance" class="text-sky-400 font-semibold">-- m</span></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Load Chart Table & Curve Tabs -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg flex-1 flex flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-4 bg-purple-500 rounded-sm"></span>
+            <h2 class="text-sm font-bold uppercase tracking-wider text-slate-200">4. 不同工作半徑吊重能力表 (Load Chart &amp; Capacity Curve)</h2>
+          </div>
+
+          <div class="flex items-center gap-2 flex-wrap">
+            <div class="inline-flex rounded-lg bg-slate-950 p-0.5 border border-slate-800 text-xs">
+              <button type="button" id="tabTableBtn" onclick="switchChartTab('table')" class="px-3 py-1 rounded-md bg-amber-500 text-slate-950 font-semibold transition">當前配置負載表</button>
+              <button type="button" id="tabMatrixBtn" onclick="switchChartTab('matrix')" class="px-3 py-1 rounded-md text-slate-400 hover:text-white transition">全臂長矩陣表</button>
+              <button type="button" id="tabCurveBtn" onclick="switchChartTab('curve')" class="px-3 py-1 rounded-md text-slate-400 hover:text-white transition">能力曲線圖</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 1: Interactive Load Chart Table -->
+        <div id="loadTableContainer" class="overflow-x-auto max-h-[250px] overflow-y-auto rounded-lg border border-slate-800">
+          <table class="w-full text-left border-collapse text-xs mono">
+            <thead class="bg-slate-950 text-slate-400 sticky top-0 z-10 border-b border-slate-800">
+              <tr>
+                <th class="py-2 px-3">工作半徑 (m)</th>
+                <th class="py-2 px-3">主臂仰角 (°)</th>
+                <th class="py-2 px-3">最大臂頭高 (m)</th>
+                <th class="py-2 px-3 text-amber-400">額定總吊重 SWL (t)</th>
+                <th class="py-2 px-3">扣減鈎+索具 (t)</th>
+                <th class="py-2 px-3 text-cyan-400">可用淨吊重 Net (t)</th>
+                <th class="py-2 px-3">對比貨物 (<span id="tableLoadWeightHeader">6.5</span>t)</th>
+                <th class="py-2 px-3 text-right">操作</th>
+              </tr>
+            </thead>
+            <tbody id="loadChartTableBody" class="divide-y divide-slate-800/70 bg-slate-900/50"></tbody>
+          </table>
+        </div>
+
+        <!-- Tab 2: Inline Full Boom Matrix -->
+        <div id="inlineMatrixContainer" class="hidden overflow-x-auto max-h-[250px] overflow-y-auto rounded-lg border border-slate-800">
+          <table class="w-full text-center border-collapse text-xs mono" id="inlineMatrixTable"></table>
+        </div>
+
+        <!-- Tab 3: Capacity vs Radius Curve Canvas -->
+        <div id="loadCurveContainer" class="hidden h-[240px] w-full bg-slate-950 rounded-lg border border-slate-800 p-2 relative">
+          <canvas id="curveCanvas" class="w-full h-full block"></canvas>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="loadChartModal" class="fixed inset-0 z-50 hidden bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-2 md:p-6">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-[1440px] max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black text-base">📊</span>
+          <div>
+            <h3 class="text-base font-bold text-white">各型號吊機完整負載總表查詢系統 (Crane Load Chart Matrix Explorer)</h3>
+            <p class="text-xs text-slate-400">橫向對比所有主臂長度 (Main Boom) 與不同工作半徑 (Working Radius) 之額定吊重・點擊任何格仔即可直接帶入模擬器</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeLoadChartExplorer()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-200 hover:text-white text-xs font-bold transition">
+          ✕ 關閉視窗 (ESC)
+        </button>
+      </div>
+
+      <div class="px-5 py-3 bg-slate-900/90 border-b border-slate-800 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">1. 品牌 (Brand)</label>
+          <select id="explorerBrandSelect" onchange="onExplorerBrandChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:border-amber-500 focus:outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">2. 型號 (Model)</label>
+          <select id="explorerCraneSelect" onchange="onExplorerCraneChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white font-semibold focus:border-amber-500 focus:outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">3. 配重重量 (Counterweight)</label>
+          <select id="explorerCwSelect" onchange="renderExplorerMatrix()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white mono focus:border-amber-500 focus:outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">4. 副臂長度 (Fly / Fixed Jib)</label>
+          <select id="explorerJibSelect" onchange="onExplorerJibChange()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white mono focus:border-amber-500 focus:outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">5. 副臂傾角 (Jib Offset)</label>
+          <select id="explorerOffsetSelect" onchange="renderExplorerMatrix()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white mono focus:border-amber-500 focus:outline-none"></select>
+        </div>
+        <div>
+          <label class="block text-[11px] text-slate-400 mb-1">6. 顯示數值模式</label>
+          <select id="explorerValueMode" onchange="renderExplorerMatrix()" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-amber-400 font-semibold focus:border-amber-500 focus:outline-none">
+            <option value="gross">額定總吊重 Gross SWL (t)</option>
+            <option value="net">扣除鈎及索具後可用淨重 Net (t)</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="explorerSpecBanner" class="px-5 py-2 bg-slate-950/60 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs mono text-slate-300"></div>
+
+      <div class="flex-1 overflow-auto p-4 bg-slate-950/40">
+        <div class="rounded-xl border border-slate-800 overflow-hidden shadow-inner bg-slate-900/60">
+          <table id="explorerMatrixTable" class="w-full border-collapse text-xs mono text-center"></table>
+        </div>
+      </div>
+
+      <div class="px-5 py-2.5 bg-slate-950 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+        <div class="flex items-center gap-4">
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-500/20 border border-emerald-500/60 inline-block"></span> 足夠吊起當前貨物 (<span id="explorerFooterCargo">6.5</span>t)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-rose-500/15 border border-rose-500/40 inline-block"></span> 低於當前貨物需求 (超載)</span>
+          <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-500 text-slate-950 inline-block"></span> 當前模擬器選中之工作點</span>
+        </div>
+        <div>💡 點擊表格內任何一個噸數格仔，即可自動將該「吊機 + 主臂 + 半徑」套用至 2D 吊運防撞模擬器。</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="craneBuilderModal" class="fixed inset-0 z-50 hidden bg-slate-950/90 backdrop-blur-sm flex items-center justify-center p-2 md:p-5">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-[1480px] h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+
+      <!-- Builder Modal Header -->
+      <div class="px-5 py-3.5 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <span class="w-8 h-8 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-black text-base">🛠️</span>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 class="text-base font-bold text-white">新增 / 編輯吊機精靈與車隊資料庫 (Crane Builder &amp; Jib Geometry Manager)</h3>
+              <span class="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">支援主臂及副臂獨立截面尺寸</span>
+            </div>
+            <p class="text-xs text-slate-400">可自由新增吊機型號、設定主臂/副臂(Jib)幾何尺寸及輸入 Load Chart 矩陣</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="exportCraneDatabaseJSON()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-semibold transition">
+            ⬇️ 匯出 JSON 備份
+          </button>
+          <label class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 text-xs font-semibold transition cursor-pointer">
+            ⬆️ 匯入 JSON 吊機庫
+            <input type="file" accept=".json" onchange="importCraneDatabaseJSON(event)" class="hidden">
+          </label>
+          <button type="button" onclick="closeCraneBuilderModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-200 hover:text-white text-xs font-bold transition">
+            ✕ 關閉 (ESC)
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Builder Body: Left Sidebar + Right Editor -->
+      <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+
+        <!-- Left Fleet List (3 Cols) -->
+        <div class="lg:col-span-3 bg-slate-950/70 border-r border-slate-800 flex flex-col overflow-hidden">
+          <div class="p-3 border-b border-slate-800 flex items-center justify-between gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-300">現有吊機清單 (<span id="fleetCountLabel">5</span>)</span>
+            <button type="button" onclick="createNewCraneTemplate()" class="px-2.5 py-1 rounded-md bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition">
+              + 新增空白吊機
+            </button>
+          </div>
+          <div id="builderFleetList" class="flex-1 overflow-y-auto p-2.5 space-y-1.5"></div>
+          <div class="p-3 border-t border-slate-800 bg-slate-950 text-[11px] text-slate-400 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span>本機自訂儲存狀態:</span>
+              <span id="storageStatusBadge" class="mono text-emerald-400 font-semibold">已同步</span>
+            </div>
+            <button type="button" onclick="resetDefaultDatabase()" class="w-full py-1 rounded bg-slate-900 hover:bg-rose-950/60 text-slate-400 hover:text-rose-300 border border-slate-800 text-[11px] transition">
+              🔄 還原原廠預設吊機庫
+            </button>
+          </div>
+        </div>
+
+        <!-- Right Crane Editor (9 Cols) -->
+        <div class="lg:col-span-9 flex flex-col overflow-hidden bg-slate-900">
+          <div class="px-5 py-2.5 bg-slate-950/50 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 text-xs">
+              <button type="button" id="bTab1Btn" onclick="switchBuilderStep(1)" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition">
+                步驟 1: 基本規格與主/副臂截面尺寸
+              </button>
+              <span class="text-slate-600">→</span>
+              <button type="button" id="bTab2Btn" onclick="switchBuilderStep(2)" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition">
+                步驟 2: 主臂、配重、副臂與吊鈎
+              </button>
+              <span class="text-slate-600">→</span>
+              <button type="button" id="bTab3Btn" onclick="switchBuilderStep(3)" class="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition">
+                步驟 3: 編輯 Load Chart 矩陣表
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="cloneCurrentBuilderCrane()" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs transition">
+                📋 複製此吊機修改
+              </button>
+              <button type="button" id="deleteCraneBtn" onclick="deleteCurrentBuilderCrane()" class="px-2.5 py-1.5 rounded-lg bg-rose-950/80 hover:bg-rose-800 text-rose-300 text-xs transition">
+                🗑️ 刪除此吊機
+              </button>
+              <button type="button" onclick="saveBuilderCraneAndApply()" class="px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 transition">
+                💾 儲存並套用至模擬器
+              </button>
+            </div>
+          </div>
+
+          <div class="flex-1 overflow-y-auto p-5">
+
+            <!-- STEP 1: Basic Info & Boom/Jib Geometry -->
+            <div id="builderStep1" class="space-y-5 max-w-4xl">
+              <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                <h4 class="text-sm font-bold text-amber-400 mb-3">A. 吊機型號識別與分類</h4>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div class="md:col-span-2">
+                    <label class="block text-xs text-slate-400 mb-1">吊機顯示名稱 (Display Name) *</label>
+                    <input id="b_name" type="text" placeholder="例如：Kobelco CKS900 (90t 履帶吊機)" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slate-400 mb-1">品牌 (Brand) *</label>
+                    <input id="b_brand" type="text" placeholder="例如：Kobelco" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slate-400 mb-1">系統代號 ID (英文及底線)</label>
+                    <input id="b_id" type="text" placeholder="例如：kobelco_cks900" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-300 mono focus:border-emerald-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slate-400 mb-1">吊臂結構類型 (影響 2D 繪圖外觀)</label>
+                    <select id="b_isLattice" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none">
+                      <option value="true">格構式桁架臂 (Lattice Boom + A-Frame 履帶吊機)</option>
+                      <option value="false">油壓伸縮臂 (Telescopic Boom 全地面/輪胎吊機)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slate-400 mb-1">類別描述標籤 (Type Label)</label>
+                    <input id="b_type" type="text" placeholder="Heavy Duty Crawler Crane" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-emerald-500 focus:outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-xs text-slate-400 mb-1">最大額定吊重 Max Capacity (t)</label>
+                    <input id="b_maxCap" type="number" step="1" min="5" max="3000" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-400 font-bold mono focus:border-emerald-500 focus:outline-none">
+                  </div>
+                </div>
+              </div>
+
+              <!-- Geometry Parameters for 2D Collision -->
+              <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                  <h4 class="text-sm font-bold text-cyan-400">B. 主臂與副臂(Jib)幾何尺寸（決定 2D 防撞淨空計算）</h4>
+                  <span class="text-[11px] text-slate-400">可從原廠規格書 Dimensions 頁查得</span>
+                </div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">主臂鉸點水平偏移 (m)</label>
+                    <input id="b_pivotOffsetX" type="number" step="0.05" value="1.40" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white mono">
+                    <span class="text-[10px] text-slate-500">距離迴轉中心 (如 1.4m)</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">主臂鉸點離地高度 (m)</label>
+                    <input id="b_pivotHeightY" type="number" step="0.05" value="2.70" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white mono">
+                    <span class="text-[10px] text-slate-500">Boom Foot Pin 高 (如 2.7m)</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-amber-400 font-semibold mb-1">主臂截面闊/高 (m) *</label>
+                    <input id="b_boomWidth" type="number" step="0.05" value="1.66" class="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-3 py-1.5 text-sm text-amber-300 font-bold mono">
+                    <span class="text-[10px] text-slate-500">例如 HS885 主臂為 1.66m</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-sky-400 font-semibold mb-1">副臂 Jib 截面闊/高 (m) *</label>
+                    <input id="b_jibWidth" type="number" step="0.05" value="0.95" class="w-full bg-slate-900 border border-sky-500/50 rounded-lg px-3 py-1.5 text-sm text-sky-300 font-bold mono">
+                    <span class="text-[10px] text-slate-500">例如 HS885 副臂為 0.95m</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-emerald-400 font-semibold mb-1">臂頭滑輪下緣偏心 (m)</label>
+                    <input id="b_headOffset" type="number" step="0.05" value="0.45" class="w-full bg-slate-900 border border-emerald-500/50 rounded-lg px-3 py-1.5 text-sm text-emerald-300 mono">
+                    <span class="text-[10px] text-slate-500">滑輪低於中心線距離 (0.45m)</span>
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">車尾迴轉半徑 Tail Swing (m)</label>
+                    <input id="b_tailSwing" type="number" step="0.1" value="5.50" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white mono">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">最小工作仰角 Min Angle (°)</label>
+                    <input id="b_minAngle" type="number" step="1" value="15" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white mono">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-slate-400 mb-1">最大工作仰角 Max Angle (°)</label>
+                    <input id="b_maxAngle" type="number" step="1" value="82" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white mono">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- STEP 2: Booms, Counterweights, Jibs & Hooks -->
+            <div id="builderStep2" class="hidden space-y-5 max-w-5xl">
+              <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                <h4 class="text-sm font-bold text-amber-400 mb-2">A. 可選主臂長度列表 (Main Boom Lengths, m)</h4>
+                <p class="text-xs text-slate-400 mb-2">請以逗號 <code class="text-amber-300">,</code> 分隔輸入所有主臂長度（米）：</p>
+                <input id="b_mainBooms" type="text" placeholder="11, 17, 23, 29, 35, 41, 47, 56, 62, 74" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-300 mono focus:border-emerald-500 focus:outline-none">
+              </div>
+
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-bold text-cyan-400">B. 配重組合 (Counterweights)</h4>
+                    <button type="button" onclick="addBuilderCwRow()" class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">+ 新增配重</button>
+                  </div>
+                  <div id="b_cwList" class="space-y-2"></div>
+                </div>
+
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-sm font-bold text-emerald-400">C. 吊鈎規格 (Hook Blocks)</h4>
+                    <button type="button" onclick="addBuilderHookRow()" class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">+ 新增吊鈎</button>
+                  </div>
+                  <div id="b_hookList" class="space-y-2"></div>
+                </div>
+              </div>
+
+              <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 class="text-sm font-bold text-purple-400">D. 副臂配置 (Fixed / Fly Jibs)</h4>
+                    <p class="text-[11px] text-slate-400">可設定不同副臂長度、容許傾角及最大允許搭配的主臂長度</p>
+                  </div>
+                  <button type="button" onclick="addBuilderJibRow()" class="text-xs px-2.5 py-1 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40">+ 新增副臂長度</button>
+                </div>
+                <div id="b_jibList" class="space-y-2"></div>
+              </div>
+            </div>
+
+            <!-- STEP 3: Interactive Load Chart Matrix Editor -->
+            <div id="builderStep3" class="hidden space-y-4">
+              <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 class="text-sm font-bold text-amber-400">Load Chart 額定吊重矩陣編輯器 (單位：公噸 t)</h4>
+                  <p class="text-xs text-slate-400">可直接於格仔內輸入各「主臂長度 × 工作半徑」的額定總吊重 (Gross SWL)。留空代表超出該主臂的工作半徑範圍。</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <button type="button" onclick="autoGenerateLoadChartByFormula()" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition">
+                    ⚡ 依最大吊重及力矩自動生成數值
+                  </button>
+                  <div class="flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-lg px-2 py-1">
+                    <input id="customRadiusInput" type="number" step="0.5" min="2" max="120" placeholder="半徑(m)" class="w-16 bg-transparent text-xs text-white mono focus:outline-none">
+                    <button type="button" onclick="addCustomRadiusRow()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-emerald-500 hover:text-slate-950 text-slate-200 text-xs font-medium transition">
+                      + 新增半徑列
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="rounded-xl border border-slate-800 overflow-x-auto bg-slate-950/60 max-h-[50vh]">
+                <table id="builderMatrixTable" class="w-full border-collapse text-xs mono text-center"></table>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DEFAULT_CRANE_DB = {
+      "liebherr_hs885": {
+        id: "liebherr_hs885",
+        name: "Liebherr HS 885 HD (120t 履帶吊機 - 官方規格)",
+        brand: "Liebherr",
+        type: "Heavy Duty Crawler Crane",
+        isLattice: true,
+        maxCap: 120,
+        pivotOffsetX: 1.40,
+        pivotHeightY: 2.72,
+        boomWidth: 1.66,      // 原廠 No. 1515.xx 主臂截面闊度 1660mm
+        jibWidth: 0.95,       // 原廠 No. 0806.xx 副臂截面闊度 950mm
+        headOffset: 0.45,     // 臂頭滑輪下緣偏心距
+        tailSwing: 5.52,
+        minAngle: 15,
+        maxAngle: 82,
+        mainBooms: [11, 17, 23, 29, 35, 41, 47, 56, 62, 74],
+        jibs: [
+          { length: 0, name: "無副臂 (Main Boom Only - No. 1515.xx)", offsets: [0], weights: 0 },
+          { length: 11, name: "11m 固定副臂 (Fixed Jib No. 0806.xx)", offsets: [15, 30], weights: 1.68, maxMainBoom: 47 },
+          { length: 20, name: "20m 固定副臂 (Fixed Jib No. 0806.xx)", offsets: [15, 30], weights: 2.15, maxMainBoom: 47 },
+          { length: 26, name: "26m 固定副臂 (Fixed Jib No. 0806.xx)", offsets: [15, 30], weights: 2.45, maxMainBoom: 47 },
+          { length: 32, name: "32m 固定副臂 (Fixed Jib No. 0806.xx)", offsets: [15, 30], weights: 2.75, maxMainBoom: 47 }
+        ],
+        counterweights: [
+          { weight: 32.5, name: "32.5 t (24.1t 基本 + 8.4t 附加全配重)", factor: 1.0 },
+          { weight: 24.1, name: "24.1 t (19.6t 基本 + 4.5t 附加配重)", factor: 0.84 },
+          { weight: 19.6, name: "19.6 t (僅基本車尾配重 Basic CW)", factor: 0.75 }
+        ],
+        hooks: [
+          { id: "h120", name: "120t 雙滑輪主吊鈎 (2 Sheaves - 1,400 kg)", capacity: 120, weight: 1.40, height: 2.2 },
+          { id: "h60", name: "60t 單滑輪主吊鈎 (1 Sheave - 970 kg)", capacity: 60, weight: 0.97, height: 1.9 },
+          { id: "h30", name: "30t 單輪副鈎 (Single Hook - 400 kg)", capacity: 30, weight: 0.40, height: 1.4 }
+        ],
+        exactCharts: {
+          "32.5": {
+            11: { 3.8: 120.0, 4.0: 114.5, 5.0: 96.2, 6.0: 81.5, 7.0: 66.8, 8.0: 54.5, 9.0: 45.8, 10.0: 39.2 },
+            17: { 4.0: 108.0, 5.0: 94.8, 6.0: 80.6, 7.0: 66.2, 8.0: 54.1, 9.0: 45.4, 10.0: 39.0, 12.0: 30.2, 14.0: 24.5, 16.0: 20.4 },
+            23: { 4.5: 96.5, 5.0: 91.2, 6.0: 79.4, 7.0: 65.5, 8.0: 53.6, 9.0: 45.0, 10.0: 38.6, 12.0: 29.8, 14.0: 24.1, 16.0: 20.1, 18.0: 17.1, 20.0: 14.8, 22.0: 12.9 },
+            29: { 5.0: 84.0, 6.0: 76.8, 7.0: 64.5, 8.0: 52.9, 9.0: 44.4, 10.0: 38.1, 12.0: 29.4, 14.0: 23.7, 16.0: 19.7, 18.0: 16.7, 20.0: 14.4, 22.0: 12.6, 24.0: 11.1, 26.0: 9.9, 28.0: 8.8 },
+            35: { 6.0: 71.2, 7.0: 63.2, 8.0: 52.1, 9.0: 43.7, 10.0: 37.5, 12.0: 28.9, 14.0: 23.3, 16.0: 19.3, 18.0: 16.3, 20.0: 14.0, 22.0: 12.2, 24.0: 10.7, 26.0: 9.5, 28.0: 8.5, 30.0: 7.6, 32.0: 6.9, 34.0: 6.2 },
+            41: { 7.0: 58.5, 8.0: 51.0, 9.0: 42.9, 10.0: 36.8, 12.0: 28.3, 14.0: 22.8, 16.0: 18.8, 18.0: 15.9, 20.0: 13.6, 22.0: 11.8, 24.0: 10.3, 26.0: 9.1, 28.0: 8.1, 30.0: 7.2, 32.0: 6.5, 34.0: 5.8, 36.0: 5.3, 38.0: 4.8 },
+            47: { 8.0: 46.8, 9.0: 41.8, 10.0: 36.0, 12.0: 27.7, 14.0: 22.2, 16.0: 18.3, 18.0: 15.4, 20.0: 13.1, 22.0: 11.3, 24.0: 9.9, 26.0: 8.7, 28.0: 7.7, 30.0: 6.8, 32.0: 6.1, 34.0: 5.4, 36.0: 4.9, 38.0: 4.4, 40.0: 4.0, 44.0: 3.2 },
+            56: { 9.0: 35.5, 10.0: 33.2, 12.0: 26.5, 14.0: 21.2, 16.0: 17.4, 18.0: 14.5, 20.0: 12.3, 22.0: 10.5, 24.0: 9.1, 26.0: 7.9, 28.0: 6.9, 30.0: 6.1, 32.0: 5.4, 34.0: 4.7, 36.0: 4.2, 38.0: 3.7, 40.0: 3.3, 44.0: 2.5, 48.0: 1.9 },
+            62: { 10.0: 27.8, 12.0: 24.8, 14.0: 20.4, 16.0: 16.7, 18.0: 13.9, 20.0: 11.7, 22.0: 9.9, 24.0: 8.5, 26.0: 7.4, 28.0: 6.4, 30.0: 5.6, 32.0: 4.8, 34.0: 4.2, 36.0: 3.7, 38.0: 3.2, 40.0: 2.8, 44.0: 2.0 },
+            74: { 12.0: 17.5, 14.0: 16.2, 16.0: 14.5, 18.0: 12.4, 20.0: 10.4, 22.0: 8.7, 24.0: 7.3, 26.0: 6.2, 28.0: 5.2, 30.0: 4.4, 32.0: 3.7, 34.0: 3.1, 36.0: 2.5, 38.0: 2.0, 40.0: 1.6 }
+          }
+        },
+        fixedJibCharts: {
+          11: {
+            15: { 10: 24.5, 12: 23.2, 14: 20.8, 16: 18.1, 18: 15.6, 20: 13.4, 22: 11.6, 24: 10.2, 26: 9.0, 28: 8.0, 30: 7.1, 32: 6.4, 36: 5.1, 40: 4.1, 44: 3.3, 48: 2.6 },
+            30: { 12: 17.8, 14: 16.9, 16: 15.8, 18: 14.5, 20: 12.9, 22: 11.3, 24: 9.9, 26: 8.8, 28: 7.8, 30: 7.0, 32: 6.3, 36: 5.0, 40: 4.0, 44: 3.2, 48: 2.5 }
+          },
+          20: {
+            15: { 12: 13.8, 14: 13.1, 16: 12.3, 18: 11.4, 20: 10.5, 22: 9.6, 24: 8.7, 26: 7.8, 28: 7.0, 30: 6.3, 32: 5.6, 36: 4.5, 40: 3.6, 44: 2.8, 48: 2.2, 52: 1.7 },
+            30: { 14: 9.6, 16: 9.2, 18: 8.8, 20: 8.3, 22: 7.8, 24: 7.3, 26: 6.8, 28: 6.3, 30: 5.8, 32: 5.3, 36: 4.3, 40: 3.5, 44: 2.7, 48: 2.1, 52: 1.6 }
+          },
+          26: {
+            15: { 14: 9.8, 16: 9.3, 18: 8.7, 20: 8.1, 22: 7.5, 24: 6.9, 26: 6.3, 28: 5.8, 30: 5.3, 32: 4.8, 36: 3.9, 40: 3.1, 44: 2.4, 48: 1.8, 52: 1.4, 56: 1.0 },
+            30: { 16: 6.8, 18: 6.5, 20: 6.2, 22: 5.9, 24: 5.6, 26: 5.3, 28: 5.0, 30: 4.7, 32: 4.4, 36: 3.7, 40: 3.0, 44: 2.3, 48: 1.8, 52: 1.3 }
+          },
+          32: {
+            15: { 16: 6.9, 18: 6.5, 20: 6.1, 22: 5.7, 24: 5.3, 26: 4.9, 28: 4.5, 30: 4.1, 32: 3.8, 36: 3.2, 40: 2.6, 44: 2.0, 48: 1.5, 52: 1.1 },
+            30: { 18: 4.8, 20: 4.6, 22: 4.4, 24: 4.2, 26: 4.0, 28: 3.8, 30: 3.6, 32: 3.4, 36: 3.0, 40: 2.5, 44: 1.9, 48: 1.4 }
+          }
+        }
+      },
+      "ltm1055": {
+        id: "ltm1055",
+        name: "Liebherr LTM 1055-3.2 (55t 全地面吊機)",
+        brand: "Liebherr",
+        type: "All-Terrain Telescopic",
+        isLattice: false,
+        maxCap: 55,
+        pivotOffsetX: 1.2,
+        pivotHeightY: 2.6,
+        boomWidth: 0.95,
+        jibWidth: 0.55,
+        headOffset: 0.35,
+        tailSwing: 3.45,
+        minAngle: 15,
+        maxAngle: 82,
+        mainBooms: [10.2, 18.0, 25.5, 33.0, 40.0],
+        jibs: [
+          { length: 0, name: "無副臂 (Main Boom Only)", offsets: [0], weights: 0 },
+          { length: 9.5, name: "9.5m 摺疊副臂 (Swing-away Jib)", offsets: [0, 20, 40], weights: 0.7 },
+          { length: 16.0, name: "16.0m 雙段副臂 (Double Fly Jib)", offsets: [0, 20, 40], weights: 1.1 }
+        ],
+        counterweights: [
+          { weight: 12.0, name: "12.0 t (全配重 Full Ballast)", factor: 1.0 },
+          { weight: 7.0, name: "7.0 t (標準配重 Standard)", factor: 0.78 },
+          { weight: 2.5, name: "2.5 t (輕量配重 Taxi)", factor: 0.55 }
+        ],
+        hooks: [
+          { id: "h55", name: "55t 雙聯滑輪主吊鈎 (5-Sheave, 0.55t)", capacity: 55, weight: 0.55, height: 1.4 },
+          { id: "h25", name: "25t 中型三輪吊鈎 (3-Sheave, 0.35t)", capacity: 25, weight: 0.35, height: 1.2 },
+          { id: "h6", name: "6.3t 單輪副鈎 / 重錘鈎 (Ball Hook, 0.15t)", capacity: 6.3, weight: 0.15, height: 0.9 }
+        ],
+        baseMoment: 178
+      },
+      "ltm1100": {
+        id: "ltm1100",
+        name: "Liebherr LTM 1100-5.2 (100t 全地面吊機)",
+        brand: "Liebherr",
+        type: "All-Terrain Telescopic",
+        isLattice: false,
+        maxCap: 100,
+        pivotOffsetX: 1.4,
+        pivotHeightY: 2.9,
+        boomWidth: 1.15,
+        jibWidth: 0.65,
+        headOffset: 0.40,
+        tailSwing: 4.10,
+        minAngle: 15,
+        maxAngle: 83,
+        mainBooms: [11.5, 22.0, 32.5, 43.0, 52.0],
+        jibs: [
+          { length: 0, name: "無副臂 (Main Boom Only)", offsets: [0], weights: 0 },
+          { length: 10.8, name: "10.8m 副臂 (Fly Jib)", offsets: [0, 20, 40], weights: 0.9 },
+          { length: 19.0, name: "19.0m 加長副臂 (Extended Jib)", offsets: [0, 20, 40], weights: 1.4 }
+        ],
+        counterweights: [
+          { weight: 35.0, name: "35.0 t (全配重 Full Ballast)", factor: 1.0 },
+          { weight: 22.0, name: "22.0 t (中配重 Medium)", factor: 0.80 },
+          { weight: 11.0, name: "11.0 t (基本配重 Base)", factor: 0.60 }
+        ],
+        hooks: [
+          { id: "h100", name: "100t 主吊鈎 (7-Sheave, 0.95t)", capacity: 100, weight: 0.95, height: 1.7 },
+          { id: "h50", name: "50t 標準吊鈎 (3-Sheave, 0.55t)", capacity: 50, weight: 0.55, height: 1.4 },
+          { id: "h8", name: "8.5t 單輪副鈎 (Ball Hook, 0.20t)", capacity: 8.5, weight: 0.20, height: 1.0 }
+        ],
+        baseMoment: 345
+      },
+      "gmk5250l": {
+        id: "gmk5250l",
+        name: "Grove GMK5250L (250t 長臂全地面吊機)",
+        brand: "Grove",
+        type: "Heavy All-Terrain",
+        isLattice: false,
+        maxCap: 250,
+        pivotOffsetX: 1.6,
+        pivotHeightY: 3.3,
+        boomWidth: 1.40,
+        jibWidth: 0.78,
+        headOffset: 0.45,
+        tailSwing: 4.95,
+        minAngle: 15,
+        maxAngle: 83,
+        mainBooms: [13.3, 28.0, 43.0, 58.0, 70.0],
+        jibs: [
+          { length: 0, name: "無副臂 (Main Boom Only)", offsets: [0], weights: 0 },
+          { length: 12.0, name: "12.0m 重型副臂 (Heavy Jib)", offsets: [5, 25, 45], weights: 1.3 },
+          { length: 21.0, name: "21.0m 雙摺副臂 (Bi-fold Jib)", offsets: [5, 25, 45], weights: 2.0 },
+          { length: 37.0, name: "37.0m 超長副臂 (Extended Jib)", offsets: [5, 25, 45], weights: 3.1 }
+        ],
+        counterweights: [
+          { weight: 80.0, name: "80.0 t (全配重 Max Counterweight)", factor: 1.0 },
+          { weight: 50.0, name: "50.0 t (中配重 Mid Counterweight)", factor: 0.79 },
+          { weight: 20.0, name: "20.0 t (輕配重 Min Counterweight)", factor: 0.56 }
+        ],
+        hooks: [
+          { id: "h200", name: "200t 雙滑輪組大鈎 (9-Sheave, 1.80t)", capacity: 200, weight: 1.80, height: 2.1 },
+          { id: "h100", name: "100t 主吊鈎 (5-Sheave, 1.10t)", capacity: 100, weight: 1.10, height: 1.7 },
+          { id: "h40", name: "40t 通用吊鈎 (1-Sheave, 0.65t)", capacity: 40, weight: 0.65, height: 1.4 },
+          { id: "h12", name: "12t 單輪副鈎 (Ball Hook, 0.30t)", capacity: 12, weight: 0.30, height: 1.0 }
+        ],
+        baseMoment: 790
+      },
+      "cke2500g": {
+        id: "cke2500g",
+        name: "Kobelco CKE2500G (250t 桁架臂履帶吊機)",
+        brand: "Kobelco",
+        type: "Lattice Boom Crawler",
+        isLattice: true,
+        maxCap: 250,
+        pivotOffsetX: 1.8,
+        pivotHeightY: 2.8,
+        boomWidth: 2.10,
+        jibWidth: 1.15,
+        headOffset: 0.55,
+        tailSwing: 6.00,
+        minAngle: 18,
+        maxAngle: 80,
+        mainBooms: [18.3, 30.5, 45.7, 61.0, 76.2],
+        jibs: [
+          { length: 0, name: "無副臂 (Main Boom Only)", offsets: [0], weights: 0 },
+          { length: 18.3, name: "18.3m 固定副臂 (Fixed Jib)", offsets: [10, 30], weights: 1.8 },
+          { length: 30.5, name: "30.5m 長副臂 (Long Fixed Jib)", offsets: [10, 30], weights: 2.9 }
+        ],
+        counterweights: [
+          { weight: 90.0, name: "90.0 t (車身90t + 履帶24t 全配重)", factor: 1.0 },
+          { weight: 65.0, name: "65.0 t (減配重模式 Reduced)", factor: 0.78 }
+        ],
+        hooks: [
+          { id: "h250", name: "250t 重型主鈎 (2.40t)", capacity: 250, weight: 2.40, height: 2.3 },
+          { id: "h100c", name: "100t 主鈎 (1.30t)", capacity: 100, weight: 1.30, height: 1.8 },
+          { id: "h35c", name: "35t 副吊鈎 (0.75t)", capacity: 35, weight: 0.75, height: 1.4 },
+          { id: "h13c", name: "13.5t 單輪球鈎 (0.35t)", capacity: 13.5, weight: 0.35, height: 1.0 }
+        ],
+        baseMoment: 940
+      }
+    };
+
+    const STORAGE_KEY = "CRANE_SIM_CUSTOM_DB_V3";
+    let CRANE_DB = loadCraneDatabaseFromStorage();
+
+    function loadCraneDatabaseFromStorage() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) {
+            return { ...structuredClone(DEFAULT_CRANE_DB), ...parsed };
+          }
+        }
+      } catch (e) {
+        console.warn("Failed to load custom cranes:", e);
+      }
+      return structuredClone(DEFAULT_CRANE_DB);
+    }
+
+    function saveCraneDatabaseToStorage() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(CRANE_DB));
+      } catch (e) {
+        console.warn("Failed to save CRANE_DB:", e);
+      }
+    }
+
+    const state = {
+      craneId: "liebherr_hs885",
+      mainBoom: 29.0,
+      jibLength: 20.0,
+      jibOffset: 15,
+      cwWeight: 32.5,
+      hookId: "h30",
+      workingRadius: 18.0,
+      loadBottomElevation: 20.0,
+      loadLength: 5.5,
+      loadWidth: 3.0,
+      loadHeight: 3.2,
+      loadOrientation: "length",
+      loadWeight: 6.5,
+      slingMode: "length",
+      slingLength: 5.0,
+      slingAngleDeg: 60,
+      slingLegs: 2,
+      beamType: "none",
+      lugInset: 0,
+      beamLength: 5.5,
+      beamDepth: 0.35,
+      secondarySlingLength: 1.2,
+      slingWll: 0,
+      riggingWeight: 0.4,
+      chartTab: "table",
+      isDraggingLoad: false
+    };
+
+    function interpolateTable(radiusMap, targetR) {
+      const radii = Object.keys(radiusMap).map(Number).sort((a, b) => a - b);
+      if (radii.length === 0) return 0;
+      const minR = radii[0];
+      const maxR = radii[radii.length - 1];
+      if (targetR < minR - 0.3 || targetR > maxR + 0.5) return 0;
+      const clampedR = Math.max(minR, Math.min(maxR, targetR));
+
+      for (let i = 0; i < radii.length; i++) {
+        if (Math.abs(clampedR - radii[i]) < 0.05) {
+          return radiusMap[radii[i]];
+        }
+      }
+      for (let i = 0; i < radii.length - 1; i++) {
+        const r1 = radii[i];
+        const r2 = radii[i + 1];
+        if (clampedR >= r1 && clampedR <= r2) {
+          const t = (clampedR - r1) / (r2 - r1);
+          return radiusMap[r1] + t * (radiusMap[r2] - radiusMap[r1]);
+        }
+      }
+      return 0;
+    }
+
+    function getCraneGrossCapacity(crane, mainBoom, jibLen, jibOffset, cwWeight, radius) {
+      const cwObj = crane.counterweights.find(c => Math.abs(c.weight - cwWeight) < 0.1) || crane.counterweights[0];
+      const cwFactor = cwObj.factor || 1.0;
+
+      if (crane.exactCharts) {
+        const baseCwKey = Object.keys(crane.exactCharts)[0];
+        const mainChartForBoom = crane.exactCharts[baseCwKey]?.[mainBoom];
+        if (mainChartForBoom) {
+          if (jibLen === 0) {
+            const rawCap = interpolateTable(mainChartForBoom, radius);
+            if (rawCap <= 0) return 0;
+            return Math.min(crane.maxCap, Math.round(rawCap * cwFactor * 10) / 10);
+          } else if (crane.fixedJibCharts && crane.fixedJibCharts[jibLen]) {
+            const offsetChart = crane.fixedJibCharts[jibLen][jibOffset] || crane.fixedJibCharts[jibLen][15] || Object.values(crane.fixedJibCharts[jibLen])[0];
+            const jibCap = interpolateTable(offsetChart, radius);
+            if (jibCap <= 0) return 0;
+            const boomLenPenalty = Math.max(0.76, 1 - (mainBoom - 23) * 0.006);
+            return Math.max(0.8, Math.round(jibCap * cwFactor * boomLenPenalty * 10) / 10);
+          }
+        }
+      }
+
+      const effectiveRadius = Math.max(2.5, radius - crane.pivotOffsetX);
+      const boomWeightPenalty = (mainBoom * 0.12) + (jibLen * 0.16);
+      const rawTippingCap = ((crane.baseMoment || crane.maxCap * 3.5) * cwFactor) / Math.pow(effectiveRadius, 1.07) - boomWeightPenalty * 0.22;
+
+      let structuralCap = crane.maxCap * Math.pow(crane.mainBooms[0] / mainBoom, 0.42);
+      if (jibLen > 0) {
+        const jibMax = crane.maxCap * 0.24 * (12 / Math.max(10, jibLen));
+        const offsetPenalty = 1 - (jibOffset * 0.0075);
+        structuralCap = Math.min(structuralCap, jibMax * offsetPenalty);
+      }
+
+      const gross = Math.min(crane.maxCap, rawTippingCap, structuralCap);
+      return gross > 0.6 ? Math.round(gross * 10) / 10 : 0;
+    }
+
+    function pointToSegmentInfo(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return { dist: Math.hypot(px - x1, py - y1), cx: x1, cy: y1, t: 0 };
+      let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+      t = Math.max(0, Math.min(1, t));
+      const cx = x1 + t * dx;
+      const cy = y1 + t * dy;
+      return { dist: Math.hypot(px - cx, py - cy), cx, cy, t };
+    }
+
+    function bearingLegCount(legs) {
+      if (legs <= 1) return 1;
+      if (legs === 3) return 3;
+      return 2;
+    }
+
+    function enModeFactor(legs, alphaDeg) {
+      const beta = 90 - alphaDeg;
+      if (beta > 60) return 0;
+      const steep = beta <= 45;
+      if (legs === 3) return steep ? 2.1 : 1.5;
+      if (legs <= 1) return 1;
+      return steep ? 1.4 : 1.0;
+    }
+
+    function angledSling(length, horiz, useAngle, angleDeg) {
+      const hSpan = Math.max(0, horiz);
+      if (hSpan < 0.02) {
+        const L = Math.max(0.4, length);
+        return { L, h: L, a: 90 };
+      }
+      if (!useAngle) {
+        const L = Math.max(length, hSpan + 0.05);
+        const h = Math.sqrt(Math.max(0.04, L * L - hSpan * hSpan));
+        return { L, h, a: (Math.atan2(h, hSpan) * 180) / Math.PI };
+      }
+      const a = Math.min(89, Math.max(15, angleDeg));
+      const h = hSpan * Math.tan((a * Math.PI) / 180);
+      return { L: Math.hypot(hSpan, h), h, a };
+    }
+
+    function solveRigging(sheaveX, loadTopY, span) {
+      const legs = [1, 2, 3, 4].includes(state.slingLegs) ? state.slingLegs : 2;
+      const beamType = state.beamType === "spreader" || state.beamType === "lifting" ? state.beamType : "none";
+      const halfSpan = span / 2;
+      const inset = Math.max(0, Math.min(state.lugInset || 0, Math.max(0, halfSpan - 0.2)));
+      const lugHalf = legs === 1 ? 0 : Math.max(0.15, halfSpan - inset);
+      const useAngle = state.slingMode === "angle" && !(legs === 1 && beamType === "none");
+      const segments = [];
+      let beam = null;
+      let slingLen = state.slingLength;
+      let slingH = 1;
+      let alpha = 90;
+
+      const lugL = { x: sheaveX - lugHalf, y: loadTopY };
+      const lugR = { x: sheaveX + lugHalf, y: loadTopY };
+      const lugC = { x: sheaveX, y: loadTopY };
+
+      if (beamType === "none") {
+        if (legs === 1) {
+          slingH = Math.max(0.6, state.slingLength);
+          slingLen = slingH;
+          alpha = 90;
+          segments.push({ name: "單腿吊索", x1: sheaveX, y1: loadTopY + slingH, x2: lugC.x, y2: lugC.y });
+        } else {
+          const fit = angledSling(state.slingLength, lugHalf, useAngle, state.slingAngleDeg);
+          slingLen = fit.L;
+          slingH = fit.h;
+          alpha = fit.a;
+          const apexY = loadTopY + slingH;
+          segments.push({ name: "近臂吊索", x1: sheaveX, y1: apexY, x2: lugL.x, y2: lugL.y });
+          segments.push({ name: "遠臂吊索", x1: sheaveX, y1: apexY, x2: lugR.x, y2: lugR.y });
+        }
+      } else if (beamType === "spreader") {
+        const beamDepth = Math.max(0.15, state.beamDepth || 0.35);
+        const beamLen = Math.max(0.8, state.beamLength > 0.3 ? state.beamLength : Math.max(span, 0.8));
+        const beamHalf = beamLen / 2;
+        const dropH = Math.max(0.3, state.secondarySlingLength || 1.2);
+        const beamBottom = loadTopY + dropH;
+        const beamTop = beamBottom + beamDepth;
+        beam = { left: sheaveX - beamHalf, right: sheaveX + beamHalf, bottom: beamBottom, top: beamTop };
+        const clampBeamX = (x) => Math.max(sheaveX - beamHalf, Math.min(sheaveX + beamHalf, x));
+        if (legs === 1) {
+          segments.push({ name: "中短索", x1: clampBeamX(lugC.x), y1: beamBottom, x2: lugC.x, y2: lugC.y });
+        } else {
+          segments.push({ name: "近臂短索", x1: clampBeamX(lugL.x), y1: beamBottom, x2: lugL.x, y2: lugL.y });
+          segments.push({ name: "遠臂短索", x1: clampBeamX(lugR.x), y1: beamBottom, x2: lugR.x, y2: lugR.y });
+        }
+        const fit = angledSling(state.slingLength, beamHalf, useAngle, state.slingAngleDeg);
+        slingLen = fit.L;
+        alpha = fit.a;
+        slingH = dropH + beamDepth + fit.h;
+        const apexY = beamTop + fit.h;
+        segments.push({ name: "近臂上索", x1: sheaveX, y1: apexY, x2: sheaveX - beamHalf, y2: beamTop });
+        segments.push({ name: "遠臂上索", x1: sheaveX, y1: apexY, x2: sheaveX + beamHalf, y2: beamTop });
+      } else {
+        const beamDepth = Math.max(0.15, state.beamDepth || 0.35);
+        const beamLen = Math.max(0.8, state.beamLength > 0.3 ? state.beamLength : Math.max(span, 0.8));
+        const beamHalf = beamLen / 2;
+        const hanger = Math.max(0.3, state.secondarySlingLength || 0.8);
+        const horiz = legs === 1 ? 0 : Math.abs(beamHalf - lugHalf);
+        const fit = angledSling(state.slingLength, horiz, useAngle && horiz >= 0.02, state.slingAngleDeg);
+        slingLen = fit.L;
+        alpha = fit.a;
+        const beamBottom = loadTopY + fit.h;
+        const beamTop = beamBottom + beamDepth;
+        beam = { left: sheaveX - beamHalf, right: sheaveX + beamHalf, bottom: beamBottom, top: beamTop };
+        slingH = fit.h + beamDepth + hanger;
+        if (legs === 1) {
+          segments.push({ name: "下索", x1: sheaveX, y1: beamBottom, x2: lugC.x, y2: lugC.y });
+        } else {
+          segments.push({ name: "近臂下索", x1: sheaveX - beamHalf, y1: beamBottom, x2: lugL.x, y2: lugL.y });
+          segments.push({ name: "遠臂下索", x1: sheaveX + beamHalf, y1: beamBottom, x2: lugR.x, y2: lugR.y });
+        }
+        segments.push({ name: "中吊索", x1: sheaveX, y1: beamTop + hanger, x2: sheaveX, y2: beamTop });
+      }
+
+      const n = bearingLegCount(legs);
+      const sinA = Math.sin((Math.max(5, Math.min(90, alpha)) * Math.PI) / 180);
+      const legTension = legs === 1 ? state.loadWeight : state.loadWeight / (n * Math.max(0.05, sinA));
+      const modeFactor = enModeFactor(legs, alpha);
+      const beta = 90 - alpha;
+      const angleViolation = alpha < 30;
+      const angleCaution = !angleViolation && (alpha < 60 || (legs === 1 && alpha < 80));
+      const wll = state.slingWll > 0 ? state.slingWll : 0;
+      const assemblyCap = wll > 0 && modeFactor > 0 ? wll * modeFactor : 0;
+      const slingOverload = wll > 0 && (legTension > wll + 0.001 || (legs > 1 && modeFactor > 0 && assemblyCap + 0.001 < state.loadWeight));
+      const note = legs === 4 ? "4 腿按 2 腿計載" : (legs === 3 ? "3 腿分載" : (legs === 1 ? "單腿垂直" : "2 腿分載"));
+
+      const points = [];
+      segments.forEach(seg => {
+        if (seg.name.includes("遠臂")) return;
+        [0.25, 0.5, 0.75].forEach(t => {
+          points.push({
+            name: seg.name,
+            x: seg.x1 + (seg.x2 - seg.x1) * t,
+            y: seg.y1 + (seg.y2 - seg.y1) * t
+          });
+        });
+      });
+      if (beam) {
+        points.push({ name: "吊樑近臂端", x: beam.left, y: (beam.top + beam.bottom) / 2 });
+        points.push({ name: "吊樑下緣", x: beam.left, y: beam.bottom });
+        points.push({ name: "吊樑上緣", x: beam.left, y: beam.top });
+      }
+
+      return {
+        legs, beamType, lugHalf, slingH, slingLen, alpha, beta,
+        legTension, modeFactor, angleViolation, angleCaution, slingOverload,
+        note, segments, beam, points, bearingLegs: n, wll, assemblyCap,
+        apexAngleDeg: legs === 1 ? 0 : Math.max(0, 180 - 2 * alpha)
+      };
+    }
+
+    function solveCraneGeometryAndCollision() {
+      const crane = CRANE_DB[state.craneId] || Object.values(CRANE_DB)[0];
+      const pX = crane.pivotOffsetX;
+      const pY = crane.pivotHeightY;
+      const L_main = state.mainBoom;
+      const L_jib = state.jibLength;
+      const offsetRad = (state.jibOffset * Math.PI) / 180;
+
+      const boomDepth = crane.boomWidth || 1.5;
+      const jibDepth = crane.jibWidth || Math.round((boomDepth * 0.58) * 100) / 100;
+      const headOffset = crane.headOffset || 0.45;
+
+      const effectiveExtX = L_main + L_jib * Math.cos(offsetRad);
+      const effectiveExtY = L_jib * Math.sin(offsetRad);
+      const L_eff = Math.hypot(effectiveExtX, effectiveExtY);
+      const gamma = Math.atan2(effectiveExtY, effectiveExtX);
+
+      const minMainRad = (crane.minAngle * Math.PI) / 180;
+      const maxMainRad = (crane.maxAngle * Math.PI) / 180;
+
+      const rAtMaxAngle = pX + L_main * Math.cos(maxMainRad) + L_jib * Math.cos(maxMainRad - offsetRad);
+      const rAtMinAngle = pX + L_main * Math.cos(minMainRad) + L_jib * Math.cos(minMainRad - offsetRad);
+
+      const minRadius = Math.max(3.5, Math.ceil(rAtMaxAngle * 2) / 2);
+      const maxRadius = Math.floor(rAtMinAngle * 2) / 2;
+
+      const R = state.workingRadius;
+      const targetDx = R - pX;
+
+      let radiusOutOfBounds = false;
+      let cosTerm = targetDx / L_eff;
+      if (cosTerm > 0.998 || cosTerm < -0.998) {
+        radiusOutOfBounds = true;
+        cosTerm = Math.max(-0.998, Math.min(0.998, cosTerm));
+      }
+
+      const alphaMinusGamma = Math.acos(cosTerm);
+      let mainAngleRad = alphaMinusGamma + gamma;
+      let mainAngleDeg = (mainAngleRad * 180) / Math.PI;
+
+      if (mainAngleDeg > crane.maxAngle || mainAngleDeg < crane.minAngle) {
+        radiusOutOfBounds = true;
+        mainAngleDeg = Math.max(crane.minAngle, Math.min(crane.maxAngle, mainAngleDeg));
+        mainAngleRad = (mainAngleDeg * Math.PI) / 180;
+      }
+
+      const mainTipX = pX + L_main * Math.cos(mainAngleRad);
+      const mainTipY = pY + L_main * Math.sin(mainAngleRad);
+
+      const jibAngleRad = mainAngleRad - offsetRad;
+      const jibAngleDeg = (jibAngleRad * 180) / Math.PI;
+      const activeTipX = L_jib > 0 ? mainTipX + L_jib * Math.cos(jibAngleRad) : mainTipX;
+      const activeTipY = L_jib > 0 ? mainTipY + L_jib * Math.sin(jibAngleRad) : mainTipY;
+
+      const activeSheaveX = activeTipX;
+      const activeSheaveY = activeTipY - headOffset;
+
+      const span = state.loadOrientation === "length" ? state.loadLength : state.loadWidth;
+      const halfSpan = span / 2;
+
+      const hookObj = crane.hooks.find(h => h.id === state.hookId) || crane.hooks[0];
+      const hookHeight = hookObj.height;
+
+      const loadBottomY = state.loadBottomElevation;
+      const loadTopY = loadBottomY + state.loadHeight;
+      const loadLeftX = activeSheaveX - halfSpan;
+      const loadRightX = activeSheaveX + halfSpan;
+
+      const rig = solveRigging(activeSheaveX, loadTopY, span);
+      const slingH = rig.slingH;
+      const slingLen = rig.slingLen;
+      const slingAngleHorizontalDeg = rig.alpha;
+      const apexAngleDeg = rig.apexAngleDeg;
+      const tensionFactor = state.loadWeight > 0 ? rig.legTension / state.loadWeight : 0;
+      const slingApexY = loadTopY + slingH;
+      const hookTopY = slingApexY + hookHeight;
+
+      const checkPoints = [
+        { name: "貨物左上內角", x: loadLeftX, y: loadTopY },
+        { name: "貨物左下內角", x: loadLeftX, y: loadBottomY },
+        { name: "貨物左中側邊", x: loadLeftX, y: (loadTopY + loadBottomY) / 2 },
+        { name: "貨物頂部近臂", x: loadLeftX + halfSpan * 0.25, y: loadTopY },
+        { name: "吊鈎組近臂緣", x: activeSheaveX - 0.45, y: slingApexY + hookHeight * 0.5 },
+        ...rig.points
+      ];
+
+      const mainHalfDepth = boomDepth / 2;
+      let minMainClearance = 999;
+      let closestMainPt = checkPoints[0];
+      let closestMainSegPt = { x: mainTipX, y: mainTipY };
+
+      const jibHalfDepth = jibDepth / 2;
+      let minJibClearance = 999;
+      let closestJibPt = checkPoints[0];
+      let closestJibSegPt = { x: activeTipX, y: activeTipY };
+
+      const mainNormX = Math.sin(mainAngleRad);
+      const mainNormY = -Math.cos(mainAngleRad);
+      const jibNormX = Math.sin(jibAngleRad);
+      const jibNormY = -Math.cos(jibAngleRad);
+
+      for (const pt of checkPoints) {
+        const infoMain = pointToSegmentInfo(pt.x, pt.y, pX, pY, mainTipX, mainTipY);
+        const signedToMain = (pt.x - infoMain.cx) * mainNormX + (pt.y - infoMain.cy) * mainNormY;
+        const surfMainDist = signedToMain < 0 ? -(infoMain.dist + mainHalfDepth) : (infoMain.dist - mainHalfDepth);
+
+        if (surfMainDist < minMainClearance) {
+          minMainClearance = surfMainDist;
+          closestMainPt = pt;
+          closestMainSegPt = {
+            x: infoMain.cx + mainNormX * mainHalfDepth,
+            y: infoMain.cy + mainNormY * mainHalfDepth
+          };
+        }
+
+        if (L_jib > 0) {
+          const infoJib = pointToSegmentInfo(pt.x, pt.y, mainTipX, mainTipY, activeTipX, activeTipY);
+          const signedToJib = (pt.x - infoJib.cx) * jibNormX + (pt.y - infoJib.cy) * jibNormY;
+          const localHalfDepth = jibHalfDepth + (1 - infoJib.t) * Math.max(0, (mainHalfDepth - jibHalfDepth) * 0.4);
+          const surfJibDist = signedToJib < 0 ? -(infoJib.dist + localHalfDepth) : (infoJib.dist - localHalfDepth);
+
+          if (surfJibDist < minJibClearance) {
+            minJibClearance = surfJibDist;
+            closestJibPt = pt;
+            closestJibSegPt = {
+              x: infoJib.cx + jibNormX * localHalfDepth,
+              y: infoJib.cy + jibNormY * localHalfDepth
+            };
+          }
+        }
+      }
+
+      let minClearance = minMainClearance;
+      let closestLoadPt = closestMainPt;
+      let closestBoomPt = closestMainSegPt;
+      let closestStructure = "主臂 (Main Boom)";
+
+      if (L_jib > 0 && minJibClearance < minMainClearance) {
+        minClearance = minJibClearance;
+        closestLoadPt = closestJibPt;
+        closestBoomPt = closestJibSegPt;
+        closestStructure = "副臂 (Fly Jib)";
+      }
+
+      const headClearance = activeSheaveY - hookTopY;
+      const isTwoBlocked = headClearance < 0.5;
+      const isBoomCollision = minClearance < 0.05;
+      const isClearanceTight = !isBoomCollision && minClearance < 1.0;
+
+      const ratedGrossCap = getCraneGrossCapacity(crane, L_main, L_jib, state.jibOffset, state.cwWeight, R);
+      const effectiveRatedCap = Math.min(ratedGrossCap, hookObj.capacity);
+      const totalDeductedLoad = Math.round((state.loadWeight + hookObj.weight + state.riggingWeight) * 100) / 100;
+      const netAvailableCap = Math.max(0, Math.round((effectiveRatedCap - hookObj.weight - state.riggingWeight) * 100) / 100);
+      const utilizationPct = effectiveRatedCap > 0 ? (totalDeductedLoad / effectiveRatedCap) * 100 : 999;
+
+      return {
+        crane,
+        hookObj,
+        pX, pY,
+        boomDepth, jibDepth, headOffset,
+        minRadius, maxRadius,
+        radiusOutOfBounds,
+        mainAngleDeg, mainAngleRad,
+        jibAngleDeg, jibAngleRad,
+        mainTipX, mainTipY,
+        activeTipX, activeTipY,
+        activeSheaveX, activeSheaveY,
+        span, halfSpan,
+        slingH, slingLen, slingAngleHorizontalDeg, apexAngleDeg, tensionFactor,
+        rig,
+        loadBottomY, loadTopY, slingApexY, hookTopY,
+        loadLeftX, loadRightX,
+        minMainClearance, closestMainPt, closestMainSegPt,
+        minJibClearance, closestJibPt, closestJibSegPt,
+        minClearance, closestLoadPt, closestBoomPt, closestStructure,
+        headClearance,
+        isTwoBlocked, isBoomCollision, isClearanceTight,
+        ratedGrossCap, effectiveRatedCap, totalDeductedLoad, netAvailableCap, utilizationPct
+      };
+    }
+
+    function initApp() {
+      populateCraneSelect();
+      syncControlsFromCrane();
+      bindControlListeners();
+      updateAll();
+      window.addEventListener("resize", () => {
+        drawSimulationCanvas();
+        if (state.chartTab === "curve") drawCapacityCurve();
+      });
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          closeLoadChartExplorer();
+          closeCraneBuilderModal();
+        }
+      });
+    }
+
+    function craneBrand(crane) {
+      if (crane && crane.brand && String(crane.brand).trim()) return String(crane.brand).trim();
+      const name = ((crane && crane.name) || "").trim();
+      return name.split(/\s+/)[0] || "其他";
+    }
+
+    function craneModelLabel(crane) {
+      const brand = craneBrand(crane);
+      const name = (crane.name || crane.id || "").trim();
+      const prefix = brand + " ";
+      if (name.toLowerCase().startsWith(prefix.toLowerCase())) return name.slice(prefix.length).trim() || name;
+      return name;
+    }
+
+    function listBrands() {
+      const brands = [];
+      Object.values(CRANE_DB).forEach(c => {
+        const brand = craneBrand(c);
+        if (!brands.includes(brand)) brands.push(brand);
+      });
+      brands.sort((a, b) => a.localeCompare(b, "zh-Hant"));
+      return brands;
+    }
+
+    function cranesForBrand(brand) {
+      return Object.values(CRANE_DB).filter(c => craneBrand(c) === brand);
+    }
+
+    function fillModelSelect(modelSel, brand, selectedId) {
+      modelSel.innerHTML = "";
+      const models = cranesForBrand(brand);
+      models.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.id;
+        opt.textContent = craneModelLabel(c);
+        if (c.id === selectedId) opt.selected = true;
+        modelSel.appendChild(opt);
+      });
+      if (!models.some(c => c.id === selectedId) && models[0]) modelSel.value = models[0].id;
+    }
+
+    function fillBrandAndModelSelects(brandSel, modelSel, selectedId) {
+      const selected = CRANE_DB[selectedId] || Object.values(CRANE_DB)[0];
+      const brand = craneBrand(selected);
+      brandSel.innerHTML = "";
+      listBrands().forEach(b => {
+        const opt = document.createElement("option");
+        opt.value = b;
+        opt.textContent = b;
+        if (b === brand) opt.selected = true;
+        brandSel.appendChild(opt);
+      });
+      fillModelSelect(modelSel, brand, selected.id);
+    }
+
+    function populateCraneSelect() {
+      const crane = CRANE_DB[state.craneId] || Object.values(CRANE_DB)[0];
+      state.craneId = crane.id;
+      fillBrandAndModelSelects(
+        document.getElementById("brandSelect"),
+        document.getElementById("craneSelect"),
+        state.craneId
+      );
+    }
+
+    function syncControlsFromCrane() {
+      const crane = CRANE_DB[state.craneId] || Object.values(CRANE_DB)[0];
+      state.craneId = crane.id;
+      document.getElementById("craneTypeBadge").textContent = crane.type;
+
+      const mbSel = document.getElementById("mainBoomSelect");
+      mbSel.innerHTML = "";
+      if (!crane.mainBooms.includes(state.mainBoom)) {
+        state.mainBoom = crane.mainBooms[Math.min(3, crane.mainBooms.length - 1)];
+      }
+      crane.mainBooms.forEach(b => {
+        const opt = document.createElement("option");
+        opt.value = b;
+        opt.textContent = `${b.toFixed(1)} m`;
+        if (b === state.mainBoom) opt.selected = true;
+        mbSel.appendChild(opt);
+      });
+
+      const cwSel = document.getElementById("cwSelect");
+      cwSel.innerHTML = "";
+      if (!crane.counterweights.some(c => c.weight === state.cwWeight)) {
+        state.cwWeight = crane.counterweights[0].weight;
+      }
+      crane.counterweights.forEach(cw => {
+        const opt = document.createElement("option");
+        opt.value = cw.weight;
+        opt.textContent = cw.name;
+        if (cw.weight === state.cwWeight) opt.selected = true;
+        cwSel.appendChild(opt);
+      });
+
+      const jibSel = document.getElementById("jibSelect");
+      jibSel.innerHTML = "";
+      if (!crane.jibs.some(j => j.length === state.jibLength)) {
+        state.jibLength = crane.jibs[0].length;
+      }
+      crane.jibs.forEach(j => {
+        const opt = document.createElement("option");
+        opt.value = j.length;
+        opt.textContent = j.name;
+        if (j.length === state.jibLength) opt.selected = true;
+        jibSel.appendChild(opt);
+      });
+
+      syncJibOffsets();
+
+      const hookSel = document.getElementById("hookSelect");
+      hookSel.innerHTML = "";
+      if (!crane.hooks.some(h => h.id === state.hookId)) {
+        state.hookId = crane.hooks[0].id;
+      }
+      crane.hooks.forEach(h => {
+        const opt = document.createElement("option");
+        opt.value = h.id;
+        opt.textContent = `${h.name} [上限 ${h.capacity}t]`;
+        if (h.id === state.hookId) opt.selected = true;
+        hookSel.appendChild(opt);
+      });
+    }
+
+    function syncJibOffsets() {
+      const crane = CRANE_DB[state.craneId];
+      const jibObj = crane.jibs.find(j => Math.abs(j.length - state.jibLength) < 0.1) || crane.jibs[0];
+      const offSel = document.getElementById("jibOffsetSelect");
+      offSel.innerHTML = "";
+      if (!jibObj.offsets.includes(state.jibOffset)) {
+        state.jibOffset = jibObj.offsets[0];
+      }
+      jibObj.offsets.forEach(ang => {
+        const opt = document.createElement("option");
+        opt.value = ang;
+        opt.textContent = jibObj.length === 0 ? "0° (主臂直吊)" : `${ang}° 傾角`;
+        if (ang === state.jibOffset) opt.selected = true;
+        offSel.appendChild(opt);
+      });
+      offSel.disabled = jibObj.length === 0;
+    }
+
+    function bindControlListeners() {
+      document.getElementById("brandSelect").addEventListener("change", e => {
+        const models = cranesForBrand(e.target.value);
+        fillModelSelect(document.getElementById("craneSelect"), e.target.value, models[0] && models[0].id);
+        state.craneId = document.getElementById("craneSelect").value;
+        syncControlsFromCrane();
+        updateAll();
+      });
+
+      document.getElementById("craneSelect").addEventListener("change", e => {
+        state.craneId = e.target.value;
+        syncControlsFromCrane();
+        updateAll();
+      });
+
+      document.getElementById("mainBoomSelect").addEventListener("change", e => {
+        state.mainBoom = parseFloat(e.target.value);
+        updateAll();
+      });
+
+      document.getElementById("cwSelect").addEventListener("change", e => {
+        state.cwWeight = parseFloat(e.target.value);
+        updateAll();
+      });
+
+      document.getElementById("jibSelect").addEventListener("change", e => {
+        state.jibLength = parseFloat(e.target.value);
+        const crane = CRANE_DB[state.craneId];
+        const jibObj = crane.jibs.find(j => Math.abs(j.length - state.jibLength) < 0.1);
+        if (jibObj && jibObj.maxMainBoom && state.mainBoom > jibObj.maxMainBoom) {
+          state.mainBoom = jibObj.maxMainBoom;
+          document.getElementById("mainBoomSelect").value = state.mainBoom;
+        }
+        syncJibOffsets();
+        updateAll();
+      });
+
+      document.getElementById("jibOffsetSelect").addEventListener("change", e => {
+        state.jibOffset = parseFloat(e.target.value);
+        updateAll();
+      });
+
+      document.getElementById("hookSelect").addEventListener("change", e => {
+        state.hookId = e.target.value;
+        updateAll();
+      });
+
+      const rSlider = document.getElementById("radiusSlider");
+      const rNum = document.getElementById("radiusNum");
+      rSlider.addEventListener("input", e => {
+        state.workingRadius = parseFloat(e.target.value);
+        rNum.value = state.workingRadius;
+        updateAll();
+      });
+      rNum.addEventListener("change", e => {
+        state.workingRadius = Math.max(3, parseFloat(e.target.value) || 10);
+        rSlider.value = state.workingRadius;
+        updateAll();
+      });
+
+      const hSlider = document.getElementById("loadHeightSlider");
+      const hNum = document.getElementById("loadHeightNum");
+      hSlider.addEventListener("input", e => {
+        state.loadBottomElevation = parseFloat(e.target.value);
+        hNum.value = state.loadBottomElevation;
+        updateAll();
+      });
+      hNum.addEventListener("change", e => {
+        state.loadBottomElevation = Math.max(0, parseFloat(e.target.value) || 0);
+        hSlider.value = state.loadBottomElevation;
+        updateAll();
+      });
+
+      ["loadLength", "loadWidth", "loadHeightDim", "loadWeight", "slingLengthInput", "slingAngleInput", "riggingWeightInput", "lugInsetInput", "beamLengthInput", "beamDepthInput", "secondarySlingInput", "slingWllInput"].forEach(id => {
+        document.getElementById(id).addEventListener("input", () => {
+          state.loadLength = Math.max(0.5, parseFloat(document.getElementById("loadLength").value) || 1);
+          state.loadWidth = Math.max(0.5, parseFloat(document.getElementById("loadWidth").value) || 1);
+          state.loadHeight = Math.max(0.5, parseFloat(document.getElementById("loadHeightDim").value) || 1);
+          state.loadWeight = Math.max(0.1, parseFloat(document.getElementById("loadWeight").value) || 1);
+          state.slingLength = Math.max(0.6, parseFloat(document.getElementById("slingLengthInput").value) || 3);
+          const includedDeg = Math.min(150, Math.max(0, parseFloat(document.getElementById("slingAngleInput").value) || 60));
+          state.slingAngleDeg = (180 - includedDeg) / 2;
+          state.riggingWeight = Math.max(0, parseFloat(document.getElementById("riggingWeightInput").value) || 0);
+          state.lugInset = Math.max(0, parseFloat(document.getElementById("lugInsetInput").value) || 0);
+          state.beamLength = Math.max(0.8, parseFloat(document.getElementById("beamLengthInput").value) || state.loadLength);
+          state.beamDepth = Math.max(0.15, parseFloat(document.getElementById("beamDepthInput").value) || 0.35);
+          state.secondarySlingLength = Math.max(0.3, parseFloat(document.getElementById("secondarySlingInput").value) || 1.2);
+          const wllRaw = parseFloat(document.getElementById("slingWllInput").value);
+          state.slingWll = Number.isFinite(wllRaw) && wllRaw > 0 ? wllRaw : 0;
+          updateAll();
+        });
+      });
+
+      document.getElementById("slingLegsSelect").addEventListener("change", e => {
+        state.slingLegs = parseInt(e.target.value, 10) || 2;
+        syncRiggingFieldLabels();
+        updateAll();
+      });
+      document.getElementById("beamTypeSelect").addEventListener("change", e => {
+        state.beamType = e.target.value;
+        syncRiggingFieldLabels();
+        updateAll();
+      });
+
+      document.getElementById("loadOrientation").addEventListener("change", e => {
+        state.loadOrientation = e.target.value;
+        updateAll();
+      });
+
+      document.getElementById("showEnvelopeToggle").addEventListener("change", () => {
+        drawSimulationCanvas();
+      });
+
+      setupCanvasDrag();
+    }
+
+    function syncRiggingFieldLabels() {
+      const beamFields = document.getElementById("beamFields");
+      const lengthLabel = document.getElementById("slingLengthLabel");
+      const secondaryLabel = document.getElementById("secondarySlingLabel");
+      const lockAngle = state.slingLegs === 1 && state.beamType === "none";
+      if (state.beamType === "none") {
+        beamFields.classList.add("hidden");
+        lengthLabel.textContent = lockAngle ? "吊索垂直長度 (m)" : "吊索長度 (m)";
+      } else {
+        beamFields.classList.remove("hidden");
+        if (state.beamType === "spreader") {
+          lengthLabel.textContent = "上索長度 (m)";
+          secondaryLabel.textContent = "下直索長度 (m)";
+        } else {
+          lengthLabel.textContent = "下索長度 (m)";
+          secondaryLabel.textContent = "中吊索長度 (m)";
+        }
+      }
+      if (lockAngle) state.slingMode = "length";
+
+      const lenBtn = document.getElementById("modeSlingLengthBtn");
+      const angBtn = document.getElementById("modeSlingAngleBtn");
+      const lenInput = document.getElementById("slingLengthInput");
+      const angInput = document.getElementById("slingAngleInput");
+      const lenBox = document.getElementById("slingLengthBox");
+      const angBox = document.getElementById("slingAngleBox");
+      const useLength = state.slingMode !== "angle" || lockAngle;
+      if (useLength) {
+        lenBtn.className = "px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-semibold transition";
+        angBtn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white transition";
+        lenInput.disabled = false;
+        angInput.disabled = true;
+        lenBox.classList.remove("opacity-60");
+        angBox.classList.add("opacity-60");
+      } else {
+        angBtn.className = "px-2 py-0.5 rounded bg-amber-500 text-slate-950 font-semibold transition";
+        lenBtn.className = "px-2 py-0.5 rounded text-slate-400 hover:text-white transition";
+        lenInput.disabled = true;
+        angInput.disabled = false;
+        angBox.classList.remove("opacity-60");
+        lenBox.classList.add("opacity-60");
+      }
+    }
+
+    function setSlingMode(mode) {
+      state.slingMode = mode;
+      syncRiggingFieldLabels();
+      updateAll();
+    }
+
+    function updateAll() {
+      syncRiggingFieldLabels();
+      const geo = solveCraneGeometryAndCollision();
+
+      const rSlider = document.getElementById("radiusSlider");
+      rSlider.min = geo.minRadius;
+      rSlider.max = geo.maxRadius;
+      document.getElementById("radiusNum").value = state.workingRadius;
+      document.getElementById("loadHeightNum").value = state.loadBottomElevation;
+      document.getElementById("minRadiusLabel").textContent = `Min: ${geo.minRadius.toFixed(1)}m`;
+      document.getElementById("maxRadiusLabel").textContent = `Max: ${geo.maxRadius.toFixed(1)}m`;
+      document.getElementById("currentAngleLabel").textContent =
+        geo.crane.jibs && state.jibLength > 0
+          ? `主臂: ${geo.mainAngleDeg.toFixed(1)}° | 副臂: ${geo.jibAngleDeg.toFixed(1)}°`
+          : `主臂仰角: ${geo.mainAngleDeg.toFixed(1)}°`;
+
+      const hSlider = document.getElementById("loadHeightSlider");
+      const maxLoadElev = Math.max(5, Math.ceil(geo.activeSheaveY - 2));
+      hSlider.max = maxLoadElev;
+      document.getElementById("hookHeightLabel").textContent = `吊鈎高度: ${geo.slingApexY.toFixed(1)}m`;
+      document.getElementById("maxLiftHeightLabel").textContent = `滑輪高度: ${geo.activeSheaveY.toFixed(1)}m`;
+
+      if (state.slingMode === "length") {
+        state.slingAngleDeg = geo.slingAngleHorizontalDeg;
+        document.getElementById("slingAngleInput").value = Math.round(geo.apexAngleDeg);
+      } else {
+        document.getElementById("slingLengthInput").value = geo.slingLen.toFixed(1);
+      }
+      const rig = geo.rig;
+      const apexText = rig.legs === 1 && rig.beamType === "none" ? "單腿垂直" : `對角 ${rig.apexAngleDeg.toFixed(0)}°`;
+      const angleTag = rig.angleViolation ? "不可用 對角>120°" : (rig.angleCaution ? (rig.legs === 1 ? "警告 側向分力" : "警告 對角>60°") : "角度合格");
+      document.getElementById("slingVerticalHeightText").textContent = `垂直佔高: ${geo.slingH.toFixed(2)}m`;
+      document.getElementById("slingApexAngleText").textContent = `${apexText} | 單腿 ${rig.legTension.toFixed(2)}t`;
+      document.getElementById("slingCodeText").textContent =
+        `EN ×${rig.modeFactor > 0 ? rig.modeFactor.toFixed(1) : "--"} | ${angleTag} | ${rig.note}` +
+        (rig.wll > 0 ? ` | WLL ${rig.wll.toFixed(1)}t / 組額定 ${rig.assemblyCap.toFixed(1)}t` : "");
+      document.getElementById("slingCodeText").className = rig.slingOverload || rig.angleViolation
+        ? "text-rose-400"
+        : (rig.angleCaution ? "text-amber-300" : "text-slate-400");
+      const beamName = rig.beamType === "spreader" ? "Spreader" : (rig.beamType === "lifting" ? "Lifting beam" : "無樑");
+      document.getElementById("overlayRigging").textContent = `${rig.legs} 腿 · ${beamName} · ${apexText}`;
+
+      document.getElementById("legendBoomDepth").textContent = `${geo.boomDepth.toFixed(2)}m`;
+      document.getElementById("legendJibDepth").textContent = `${geo.jibDepth.toFixed(2)}m`;
+      document.getElementById("overlayCraneName").textContent = geo.crane.name.split(" (")[0];
+      document.getElementById("overlayJibBadge").textContent = state.jibLength > 0 ? `Jib ${state.jibLength}m` : "Main Boom Only";
+      document.getElementById("overlayMainAngle").textContent = `${geo.mainAngleDeg.toFixed(1)}°`;
+      document.getElementById("overlayJibAngle").textContent = state.jibLength > 0
+        ? `${geo.jibAngleDeg.toFixed(1)}°  (offset ${state.jibOffset}°)`
+        : "未安裝";
+      document.getElementById("overlayMainTipH").textContent = `${geo.mainTipY.toFixed(1)} m`;
+      document.getElementById("overlayActiveTipH").textContent = `${geo.activeSheaveY.toFixed(1)} m`;
+      document.getElementById("overlaySectionDims").textContent = `${geo.boomDepth.toFixed(2)}m / ${state.jibLength > 0 ? geo.jibDepth.toFixed(2) + "m" : "無"}`;
+      document.getElementById("overlayMainClearance").textContent = `${geo.minMainClearance.toFixed(2)} m`;
+      document.getElementById("overlayMainClearance").className = geo.minMainClearance < 0.05 ? "text-rose-400 font-bold" : (geo.minMainClearance < 1.0 ? "text-amber-400 font-semibold" : "text-emerald-400 font-semibold");
+      document.getElementById("overlayJibClearance").textContent = state.jibLength > 0 ? `${geo.minJibClearance.toFixed(2)} m` : "未安裝";
+      document.getElementById("overlayJibClearance").className = state.jibLength > 0 ? (geo.minJibClearance < 0.05 ? "text-rose-400 font-bold" : (geo.minJibClearance < 1.0 ? "text-amber-400 font-semibold" : "text-sky-400 font-semibold")) : "text-slate-500";
+
+      updateDashboardStatus(geo);
+      renderLoadChartTable(geo);
+      if (state.chartTab === "matrix") renderInlineMatrix(geo);
+      if (state.chartTab === "curve") drawCapacityCurve(geo);
+      drawSimulationCanvas(geo);
+    }
+
+    function updateDashboardStatus(geo) {
+      document.getElementById("kpiTotalLoad").textContent = geo.totalDeductedLoad.toFixed(2);
+      document.getElementById("kpiRatedCap").textContent = `${geo.effectiveRatedCap.toFixed(1)} t`;
+      document.getElementById("kpiNetBreakdown").textContent =
+        `貨物 ${state.loadWeight.toFixed(1)}t + 鈎 ${geo.hookObj.weight.toFixed(2)}t + 索 ${state.riggingWeight.toFixed(1)}t`;
+
+      const utilEl = document.getElementById("kpiUtilization");
+      const utilBar = document.getElementById("kpiUtilBar");
+      const utilStatus = document.getElementById("kpiUtilStatus");
+      const netMarginEl = document.getElementById("kpiNetMargin");
+
+      const margin = geo.effectiveRatedCap - geo.totalDeductedLoad;
+      netMarginEl.textContent = margin >= 0 ? `餘裕 +${margin.toFixed(1)}t` : `超載 ${margin.toFixed(1)}t`;
+
+      const clampedBarWidth = Math.min(100, Math.max(0, geo.utilizationPct));
+      utilBar.style.width = `${clampedBarWidth}%`;
+      utilEl.textContent = geo.effectiveRatedCap > 0 ? `${geo.utilizationPct.toFixed(1)}%` : "OUT OF RANGE";
+
+      if (geo.utilizationPct > 100 || geo.effectiveRatedCap <= 0) {
+        utilEl.className = "text-lg md:text-xl font-bold text-rose-400";
+        utilBar.className = "h-full bg-rose-500 transition-all duration-200";
+        utilStatus.textContent = "OVERLOAD";
+        utilStatus.className = "mono text-[10px] text-rose-400 font-bold";
+      } else if (geo.utilizationPct > 85) {
+        utilEl.className = "text-lg md:text-xl font-bold text-amber-400";
+        utilBar.className = "h-full bg-amber-500 transition-all duration-200";
+        utilStatus.textContent = "WARNING (>85%)";
+        utilStatus.className = "mono text-[10px] text-amber-400 font-bold";
+      } else {
+        utilEl.className = "text-lg md:text-xl font-bold text-emerald-400";
+        utilBar.className = "h-full bg-emerald-500 transition-all duration-200";
+        utilStatus.textContent = "SAFE";
+        utilStatus.className = "mono text-[10px] text-emerald-400 font-semibold";
+      }
+
+      const clrVal = document.getElementById("kpiClearanceVal");
+      const clrBadge = document.getElementById("kpiClearanceBadge");
+      const clrPartTag = document.getElementById("kpiClosestPartTag");
+      const clrSub = document.getElementById("kpiDualClearanceSub");
+
+      const displayClr = Math.min(geo.minClearance, geo.headClearance);
+      clrVal.textContent = `${displayClr.toFixed(2)} m`;
+      clrPartTag.textContent = geo.isTwoBlocked ? "頂鈎 (Two-Block)" : `最近: ${geo.closestStructure.split(" ")[0]}`;
+
+      clrSub.innerHTML = state.jibLength > 0
+        ? `<span>離主臂(${geo.boomDepth}m): <b>${geo.minMainClearance.toFixed(2)}m</b></span><span>離副臂(${geo.jibDepth}m): <b>${geo.minJibClearance.toFixed(2)}m</b></span>`
+        : `<span>離主臂底面(${geo.boomDepth}m): <b>${geo.minMainClearance.toFixed(2)}m</b></span><span>臂頭淨空: <b>${geo.headClearance.toFixed(2)}m</b></span>`;
+
+      if (geo.isBoomCollision || geo.isTwoBlocked) {
+        clrVal.className = "text-lg md:text-xl font-bold text-rose-400";
+        clrBadge.textContent = "COLLISION!";
+        clrBadge.className = "mono text-[10px] text-rose-400 font-bold";
+      } else if (geo.isClearanceTight || geo.headClearance < 1.2) {
+        clrVal.className = "text-lg md:text-xl font-bold text-amber-400";
+        clrBadge.textContent = "TIGHT (<1.0m)";
+        clrBadge.className = "mono text-[10px] text-amber-400 font-bold";
+      } else {
+        clrVal.className = "text-lg md:text-xl font-bold text-emerald-400";
+        clrBadge.textContent = "CLEAR";
+        clrBadge.className = "mono text-[10px] text-emerald-400 font-semibold";
+      }
+
+      const banner = document.getElementById("verdictBanner");
+      const icon = document.getElementById("verdictIcon");
+      const badge = document.getElementById("verdictBadge");
+      const subTag = document.getElementById("verdictSubTag");
+      const detail = document.getElementById("verdictDetail");
+
+      const isOverloaded = geo.utilizationPct > 100 || geo.effectiveRatedCap <= 0;
+      const hasCollision = geo.isBoomCollision || geo.isTwoBlocked;
+      const slingFail = geo.rig.slingOverload || geo.rig.angleViolation;
+
+      if (hasCollision && isOverloaded) {
+        banner.className = "md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 bg-rose-950/70 border-rose-500";
+        icon.className = "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-rose-500/20 text-rose-400 border border-rose-500/50";
+        icon.textContent = "🚨";
+        badge.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500 text-white";
+        badge.textContent = "DANGER: COLLISION + OVERLOAD";
+        subTag.className = "text-xs text-rose-300 font-bold truncate";
+        subTag.textContent = `同時發生「撞 ${geo.closestStructure}」與「超載」`;
+        detail.textContent = `警告：${geo.closestLoadPt.name}已撞擊${geo.closestStructure}（干涉 ${Math.abs(displayClr).toFixed(2)}m），且總重超出額定吊重！`;
+      } else if (hasCollision) {
+        banner.className = "md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 bg-rose-950/70 border-rose-500";
+        icon.className = "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-rose-500/20 text-rose-400 border border-rose-500/50";
+        icon.textContent = "💥";
+        badge.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500 text-white";
+        badge.textContent = "BOOM / JIB COLLISION";
+        subTag.className = "text-xs text-rose-300 font-bold truncate";
+        subTag.textContent = geo.isTwoBlocked ? "吊鈎撞擊臂頭滑輪 (Two-Blocking)！" : `碰撞警告：${geo.closestLoadPt.name} 撞擊 ${geo.closestStructure}！`;
+        detail.textContent = geo.isTwoBlocked
+          ? `吊鈎頂部超出臂頭滑輪下緣 (${geo.headClearance.toFixed(2)}m)，請即降低吊升高度。`
+          : `計入截面厚度（主臂 ${geo.boomDepth}m / 副臂 ${geo.jibDepth}m）後，${geo.closestLoadPt.name}與${geo.closestStructure}發生碰撞干涉 (${geo.minClearance.toFixed(2)}m)。`;
+      } else if (isOverloaded) {
+        banner.className = "md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 bg-rose-950/70 border-rose-500";
+        icon.className = "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-rose-500/20 text-rose-400 border border-rose-500/50";
+        icon.textContent = "⚠️";
+        badge.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500 text-white";
+        badge.textContent = "OVERLOAD";
+        subTag.className = "text-xs text-rose-300 font-bold truncate";
+        subTag.textContent = "吊重能力不足・不可起吊";
+        detail.textContent = `在半徑 ${state.workingRadius}m 下可用淨吊重僅 ${geo.netAvailableCap.toFixed(1)}t，無法吊起 ${state.loadWeight.toFixed(1)}t 貨物。`;
+      } else if (slingFail) {
+        banner.className = "md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 bg-rose-950/70 border-rose-500";
+        icon.className = "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-rose-500/20 text-rose-400 border border-rose-500/50";
+        icon.textContent = "⚠️";
+        badge.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-500 text-white";
+        badge.textContent = geo.rig.angleViolation ? "SLING ANGLE" : "SLING OVERLOAD";
+        subTag.className = "text-xs text-rose-300 font-bold truncate";
+        subTag.textContent = geo.rig.angleViolation ? "對角夾角大於 120°・不可用" : "單腿張力超出 WLL 或 EN 組額定不足";
+        detail.textContent = geo.rig.angleViolation
+          ? `目前對角夾角 ${geo.rig.apexAngleDeg.toFixed(1)}°。EN 13414 在對角大於 120° 時不採用。`
+          : `單腿張力 ${geo.rig.legTension.toFixed(2)}t，WLL ${geo.rig.wll.toFixed(1)}t，EN 係數 ${geo.rig.modeFactor.toFixed(1)}，組額定 ${geo.rig.assemblyCap.toFixed(1)}t。${geo.rig.note}。`;
+      } else if (geo.isClearanceTight || geo.utilizationPct > 85 || geo.rig.angleCaution) {
+        banner.className = "md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 bg-amber-950/60 border-amber-500/70";
+        icon.className = "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-amber-500/20 text-amber-400 border border-amber-500/50";
+        icon.textContent = "⚡";
+        badge.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-500 text-slate-950";
+        badge.textContent = "CAUTION";
+        subTag.className = "text-xs text-amber-300 font-bold truncate";
+        subTag.textContent = "臨界操作區・請小心慢車";
+        const cautionBits = [];
+        if (geo.rig.angleCaution) {
+          cautionBits.push(geo.rig.legs === 1
+            ? `單腿吊索偏離垂直，對角夾角 ${geo.rig.apexAngleDeg.toFixed(1)}°，有側向分力。`
+            : `對角夾角 ${geo.rig.apexAngleDeg.toFixed(1)}°，大於香港作業建議 60°。`);
+        }
+        cautionBits.push(`負載率 ${geo.utilizationPct.toFixed(1)}%，離${geo.closestStructure}最小淨空 ${geo.minClearance.toFixed(2)}m（建議保持 ≥ 1.0m）。`);
+        detail.textContent = cautionBits.join("");
+      } else {
+        banner.className = "md:col-span-5 rounded-xl p-3.5 border flex items-center gap-3.5 bg-emerald-950/50 border-emerald-600/60";
+        icon.className = "w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0 bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+        icon.textContent = "✅";
+        badge.className = "text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-500 text-slate-950";
+        badge.textContent = "SAFE TO LIFT";
+        subTag.className = "text-xs text-emerald-300 font-bold truncate";
+        subTag.textContent = "可安全吊運・主/副臂淨空充足";
+        detail.textContent = `負載率 ${geo.utilizationPct.toFixed(1)}%，離主臂淨空 ${geo.minMainClearance.toFixed(2)}m${state.jibLength > 0 ? `、離副臂(Jib)淨空 ${geo.minJibClearance.toFixed(2)}m` : ""}。`;
+      }
+    }
+
+    let canvasView = {
+      scale: 6.5,
+      originX: 110,
+      originY: 380,
+      fittedKey: "",
+      cssW: 0,
+      cssH: 0
+    };
+    let loadDragGrab = { dx: 0, dy: 0 };
+
+    function getStableViewExtents(geo) {
+      const crane = geo.crane;
+      const maxMainRad = (crane.maxAngle * Math.PI) / 180;
+      const minMainRad = (crane.minAngle * Math.PI) / 180;
+      const offsetRad = (state.jibOffset * Math.PI) / 180;
+      const tipYmax = crane.pivotHeightY
+        + state.mainBoom * Math.sin(maxMainRad)
+        + state.jibLength * Math.sin(maxMainRad - offsetRad);
+      const tipXmax = crane.pivotOffsetX
+        + state.mainBoom * Math.cos(minMainRad)
+        + state.jibLength * Math.cos(minMainRad - offsetRad);
+      const tail = crane.tailSwing || 5;
+      return {
+        minX: -(tail + 3),
+        maxX: Math.max(geo.maxRadius + 8, tipXmax + 8, 30),
+        minY: 0,
+        maxY: Math.max(tipYmax + 6, 30)
+      };
+    }
+
+    function fitCanvasView(geo, W, H, force = false) {
+      const key = [
+        state.craneId,
+        state.mainBoom,
+        state.jibLength,
+        state.jibOffset,
+        Math.round(W),
+        Math.round(H)
+      ].join("|");
+      if (!force && !state.isDraggingLoad && canvasView.fittedKey === key && canvasView.scale > 1) return;
+      if (!force && state.isDraggingLoad && canvasView.scale > 1) return;
+
+      const extents = getStableViewExtents(geo);
+      const padLeft = 72;
+      const padRight = 22;
+      const padBottom = 48;
+      const padTop = 22;
+      const worldW = Math.max(12, extents.maxX - extents.minX);
+      const worldH = Math.max(12, extents.maxY - extents.minY);
+      const scale = Math.max(2.6, Math.min((W - padLeft - padRight) / worldW, (H - padBottom - padTop) / worldH));
+      canvasView.scale = scale;
+      canvasView.originX = padLeft - extents.minX * scale;
+      canvasView.originY = H - padBottom + extents.minY * scale;
+      canvasView.fittedKey = key;
+    }
+
+    function resetView() {
+      canvasView.fittedKey = "";
+      updateAll();
+    }
+
+    function drawSimulationCanvas(geoData) {
+      const geo = geoData || solveCraneGeometryAndCollision();
+      const canvas = document.getElementById("simCanvas");
+      if (!canvas) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const W = rect.width;
+      const H = rect.height;
+      if (W < 8 || H < 8) return;
+
+      if (canvasView.cssW !== W || canvasView.cssH !== H) {
+        canvas.width = Math.max(1, Math.round(W * dpr));
+        canvas.height = Math.max(1, Math.round(H * dpr));
+        canvasView.cssW = W;
+        canvasView.cssH = H;
+        canvasView.fittedKey = "";
+      }
+
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+
+      fitCanvasView(geo, W, H, false);
+
+      const scale = canvasView.scale;
+      const originX = canvasView.originX;
+      const originY = canvasView.originY;
+      const toX = (mX) => originX + mX * scale;
+      const toY = (mY) => originY - mY * scale;
+
+      const extents = getStableViewExtents(geo);
+      const maxSceneX = extents.maxX;
+      const maxSceneY = extents.maxY;
+      const minSceneX = extents.minX;
+      const stepM = scale > 9 ? 2 : (scale > 5 ? 5 : 10);
+
+      for (let x = Math.ceil(minSceneX / stepM) * stepM; x <= maxSceneX + stepM; x += stepM) {
+        const px = toX(x);
+        const isZero = Math.abs(x) < 0.001;
+        ctx.strokeStyle = isZero ? "rgba(148, 163, 184, 0.55)" : "rgba(51, 65, 85, 0.42)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, 0);
+        ctx.lineTo(px, originY);
+        ctx.stroke();
+      }
+
+      for (let y = 0; y <= maxSceneY + stepM; y += stepM) {
+        const py = toY(y);
+        ctx.strokeStyle = y === 0 ? "#475569" : "rgba(51, 65, 85, 0.42)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, py);
+        ctx.lineTo(W, py);
+        ctx.stroke();
+      }
+
+      if (document.getElementById("showEnvelopeToggle").checked) {
+        ctx.save();
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.22)";
+        ctx.setLineDash([5, 5]);
+        ctx.lineWidth = 1.5;
+        const effLenPx = Math.hypot(geo.activeTipX - geo.pX, geo.activeTipY - geo.pY) * scale;
+        ctx.beginPath();
+        ctx.arc(toX(geo.pX), toY(geo.pY), effLenPx, -(geo.crane.maxAngle * Math.PI) / 180, -(geo.crane.minAngle * Math.PI) / 180, false);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.35)";
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(toX(0), toY(0) + 10);
+      ctx.lineTo(toX(0), toY(maxSceneY));
+      ctx.stroke();
+      ctx.restore();
+
+      drawCraneBody(ctx, toX, toY, scale, geo);
+
+      drawBoomSegmentWithTrueDepth(
+        ctx,
+        toX(geo.pX), toY(geo.pY),
+        toX(geo.mainTipX), toY(geo.mainTipY),
+        geo.boomDepth * scale,
+        geo.crane.isLattice,
+        geo.minMainClearance < 0.05 ? "#ef4444" : "#f59e0b",
+        geo.minMainClearance < 0.05 ? "#fca5a5" : "#fde68a",
+        false
+      );
+
+      if (geo.crane.isLattice) {
+        const gantryTopX = toX(-1.4);
+        const gantryTopY = toY(geo.pY + 3.8);
+        ctx.strokeStyle = "#d97706";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(toX(-0.6), toY(geo.pY));
+        ctx.lineTo(gantryTopX, gantryTopY);
+        ctx.lineTo(toX(geo.pX), toY(geo.pY));
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(226, 232, 240, 0.55)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(gantryTopX, gantryTopY);
+        ctx.lineTo(toX(geo.mainTipX), toY(geo.mainTipY));
+        ctx.stroke();
+      }
+
+      if (state.jibLength > 0) {
+        drawBoomSegmentWithTrueDepth(
+          ctx,
+          toX(geo.mainTipX), toY(geo.mainTipY),
+          toX(geo.activeTipX), toY(geo.activeTipY),
+          geo.jibDepth * scale,
+          true,
+          geo.minJibClearance < 0.05 ? "#ef4444" : "#38bdf8",
+          geo.minJibClearance < 0.05 ? "#fca5a5" : "#bae6fd",
+          true
+        );
+
+        const strutLenPx = Math.max(12, 2.4 * scale);
+        const bisectorRad = (geo.mainAngleRad + geo.jibAngleRad) / 2 + Math.PI / 2;
+        const strutTipX = toX(geo.mainTipX) + Math.cos(bisectorRad) * strutLenPx;
+        const strutTipY = toY(geo.mainTipY) - Math.sin(bisectorRad) * strutLenPx;
+
+        ctx.strokeStyle = "#38bdf8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(toX(geo.mainTipX), toY(geo.mainTipY));
+        ctx.lineTo(strutTipX, strutTipY);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(186, 230, 253, 0.5)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(strutTipX, strutTipY);
+        ctx.lineTo(toX(geo.activeTipX), toY(geo.activeTipY));
+        ctx.moveTo(strutTipX, strutTipY);
+        ctx.lineTo(
+          toX(geo.mainTipX - Math.cos(geo.mainAngleRad) * Math.min(6, state.mainBoom * 0.25)),
+          toY(geo.mainTipY - Math.sin(geo.mainAngleRad) * Math.min(6, state.mainBoom * 0.25))
+        );
+        ctx.stroke();
+      }
+
+      drawBoomJibAngleMarks(ctx, toX, toY, scale, geo);
+
+      const tipPxX = toX(geo.activeTipX);
+      const tipPxY = toY(geo.activeTipY);
+      const sheavePxX = toX(geo.activeSheaveX);
+      const sheavePxY = toY(geo.activeSheaveY);
+
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(tipPxX, tipPxY);
+      ctx.lineTo(sheavePxX, sheavePxY);
+      ctx.stroke();
+
+      ctx.fillStyle = "#f59e0b";
+      ctx.beginPath();
+      ctx.arc(sheavePxX, sheavePxY, Math.max(3.5, 0.28 * scale), 0, Math.PI * 2);
+      ctx.fill();
+
+      const hookTopPxY = toY(geo.hookTopY);
+      const slingApexPxY = toY(geo.slingApexY);
+      const loadTopPxY = toY(geo.loadTopY);
+      const loadBottomPxY = toY(geo.loadBottomY);
+      const loadLeftPxX = toX(geo.loadLeftX);
+      const loadRightPxX = toX(geo.loadRightX);
+
+      ctx.strokeStyle = "#cbd5e1";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(sheavePxX - 2, sheavePxY);
+      ctx.lineTo(sheavePxX - 2, hookTopPxY);
+      ctx.moveTo(sheavePxX + 2, sheavePxY);
+      ctx.lineTo(sheavePxX + 2, hookTopPxY);
+      ctx.stroke();
+
+      const hookW = Math.max(10, 0.75 * scale);
+      const hookH = Math.max(12, slingApexPxY - hookTopPxY);
+      ctx.fillStyle = "#f59e0b";
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(sheavePxX - hookW / 2, hookTopPxY, hookW, hookH);
+      ctx.strokeRect(sheavePxX - hookW / 2, hookTopPxY, hookW, hookH);
+
+      const isColliding = geo.isBoomCollision || geo.isTwoBlocked;
+      if (geo.rig.beam) {
+        const b = geo.rig.beam;
+        ctx.fillStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.strokeStyle = geo.rig.slingOverload || geo.rig.angleViolation ? "#f43f5e" : "#e2e8f0";
+        ctx.lineWidth = 1.6;
+        ctx.fillRect(toX(b.left), toY(b.top), (b.right - b.left) * scale, (b.top - b.bottom) * scale);
+        ctx.strokeRect(toX(b.left), toY(b.top), (b.right - b.left) * scale, (b.top - b.bottom) * scale);
+      }
+      ctx.strokeStyle = isColliding || geo.rig.angleViolation ? "#f43f5e" : "#38bdf8";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      geo.rig.segments.forEach(seg => {
+        ctx.moveTo(toX(seg.x1), toY(seg.y1));
+        ctx.lineTo(toX(seg.x2), toY(seg.y2));
+      });
+      ctx.stroke();
+
+      const boxW = loadRightPxX - loadLeftPxX;
+      const boxH = loadBottomPxY - loadTopPxY;
+
+      ctx.fillStyle = isColliding
+        ? "rgba(244, 63, 94, 0.38)"
+        : (geo.utilizationPct > 100 ? "rgba(245, 158, 11, 0.35)" : "rgba(16, 185, 129, 0.28)");
+      ctx.strokeStyle = isColliding
+        ? "#f43f5e"
+        : (geo.utilizationPct > 100 ? "#f59e0b" : "#10b981");
+      ctx.lineWidth = 2.2;
+      ctx.fillRect(loadLeftPxX, loadTopPxY, boxW, boxH);
+      ctx.strokeRect(loadLeftPxX, loadTopPxY, boxW, boxH);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.14)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(loadLeftPxX, loadTopPxY);
+      ctx.lineTo(loadRightPxX, loadBottomPxY);
+      ctx.moveTo(loadRightPxX, loadTopPxY);
+      ctx.lineTo(loadLeftPxX, loadBottomPxY);
+      ctx.stroke();
+
+      const cgY = state.loadBottomElevation + state.loadHeight / 2;
+      const cgPxY = toY(cgY);
+      ctx.strokeStyle = "#38bdf8";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(sheavePxX - 6, cgPxY);
+      ctx.lineTo(sheavePxX + 6, cgPxY);
+      ctx.moveTo(sheavePxX, cgPxY - 6);
+      ctx.lineTo(sheavePxX, cgPxY + 6);
+      ctx.stroke();
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.arc(sheavePxX, cgPxY, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 11px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${state.loadWeight.toFixed(1)}t`, sheavePxX, cgPxY - 10);
+      ctx.font = "10px 'JetBrains Mono', monospace";
+      ctx.fillStyle = "#cbd5e1";
+      ctx.fillText(
+        `${state.loadOrientation === "length" ? "L" : "W"} ${geo.span.toFixed(1)}m × H ${state.loadHeight.toFixed(1)}m`,
+        sheavePxX,
+        loadBottomPxY + 13
+      );
+
+      if (document.getElementById("showEnvelopeToggle").checked) {
+        if (state.jibLength > 0) {
+          drawClearanceVector(
+            ctx,
+            toX(geo.closestMainPt.x), toY(geo.closestMainPt.y),
+            toX(geo.closestMainSegPt.x), toY(geo.closestMainSegPt.y),
+            geo.minMainClearance,
+            "主臂淨空",
+            geo.minMainClearance <= geo.minJibClearance
+          );
+          drawClearanceVector(
+            ctx,
+            toX(geo.closestJibPt.x), toY(geo.closestJibPt.y),
+            toX(geo.closestJibSegPt.x), toY(geo.closestJibSegPt.y),
+            geo.minJibClearance,
+            "副臂Jib淨空",
+            geo.minJibClearance < geo.minMainClearance
+          );
+        } else {
+          drawClearanceVector(
+            ctx,
+            toX(geo.closestMainPt.x), toY(geo.closestMainPt.y),
+            toX(geo.closestMainSegPt.x), toY(geo.closestMainSegPt.y),
+            geo.minMainClearance,
+            "主臂淨空",
+            true
+          );
+        }
+      }
+
+      const cgX = geo.activeSheaveX;
+      drawAxisScales(ctx, toX, toY, originX, originY, W, H, minSceneX, maxSceneX, maxSceneY, stepM, cgX, cgY);
+    }
+
+    function drawAxisScales(ctx, toX, toY, originX, originY, W, H, minX, maxX, maxY, stepM, cgX, cgY) {
+      ctx.fillStyle = "#0b1220";
+      ctx.fillRect(0, originY, W, H - originY);
+
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(0, originY);
+      ctx.lineTo(W, originY);
+      ctx.moveTo(originX, 0);
+      ctx.lineTo(originX, originY);
+      ctx.stroke();
+
+      ctx.font = "10px 'JetBrains Mono', monospace";
+
+      for (let x = Math.ceil(minX / stepM) * stepM; x <= maxX + 0.001; x += stepM) {
+        const px = toX(x);
+        const isZero = Math.abs(x) < 0.001;
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(px, originY);
+        ctx.lineTo(px, originY + (isZero ? 8 : 5));
+        ctx.stroke();
+        ctx.fillStyle = isZero ? "#cbd5e1" : "#94a3b8";
+        ctx.font = "10px 'JetBrains Mono', monospace";
+        ctx.textAlign = "center";
+        ctx.fillText(`${x}`, px, originY + 20);
+      }
+
+      for (let y = 0; y <= maxY + 0.001; y += stepM) {
+        const py = toY(y);
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(originX, py);
+        ctx.lineTo(originX - (y === 0 ? 8 : 5), py);
+        ctx.stroke();
+        if (y > 0) {
+          ctx.fillStyle = "#94a3b8";
+          ctx.font = "10px 'JetBrains Mono', monospace";
+          ctx.textAlign = "right";
+          ctx.fillText(`${y}`, originX - 11, py + 3);
+        }
+      }
+
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "bold 11px Inter, Microsoft JhengHei, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("工作半徑 (m)", (toX(Math.max(0, minX)) + toX(maxX)) / 2, H - 6);
+
+      ctx.save();
+      ctx.translate(14, toY(maxY * 0.45));
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillStyle = "#cbd5e1";
+      ctx.font = "bold 11px Inter, Microsoft JhengHei, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("吊升高度 (m)", 0, 0);
+      ctx.restore();
+
+      const rPx = toX(cgX);
+      const hPy = toY(cgY);
+
+      ctx.save();
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1.5;
+
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.9)";
+      ctx.beginPath();
+      ctx.moveTo(rPx, originY);
+      ctx.lineTo(rPx, hPy);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.9)";
+      ctx.beginPath();
+      ctx.moveTo(originX, hPy);
+      ctx.lineTo(rPx, hPy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "#f59e0b";
+      ctx.beginPath();
+      ctx.arc(rPx, originY, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.font = "bold 10px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`R ${cgX.toFixed(1)}`, rPx, originY - 8);
+
+      ctx.fillStyle = "#38bdf8";
+      ctx.beginPath();
+      ctx.arc(originX, hPy, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.textAlign = "left";
+      ctx.fillText(`H ${cgY.toFixed(1)}`, originX + 10, hPy - 6);
+      ctx.restore();
+    }
+
+    function drawCompactAngleTag(ctx, x, y, text, color) {
+      ctx.font = "bold 10px 'JetBrains Mono', monospace";
+      const w = ctx.measureText(text).width + 8;
+      ctx.fillStyle = "rgba(8, 18, 36, 0.78)";
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.fillRect(x - w / 2, y - 8, w, 16);
+      ctx.strokeRect(x - w / 2, y - 8, w, 16);
+      ctx.fillStyle = color;
+      ctx.textAlign = "center";
+      ctx.fillText(text, x, y + 3);
+    }
+
+    function drawBoomJibAngleMarks(ctx, toX, toY, scale, geo) {
+      const pX = toX(geo.pX);
+      const pY = toY(geo.pY);
+      const mainTipX = toX(geo.mainTipX);
+      const mainTipY = toY(geo.mainTipY);
+      const arcR = Math.max(22, Math.min(42, 2.8 * scale));
+
+      ctx.save();
+      ctx.strokeStyle = "rgba(245, 158, 11, 0.85)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(pX, pY, arcR, 0, -geo.mainAngleRad, true);
+      ctx.stroke();
+
+      const mainMidX = (pX + mainTipX) / 2;
+      const mainMidY = (pY + mainTipY) / 2;
+      const mdx = mainTipX - pX;
+      const mdy = mainTipY - pY;
+      const mlen = Math.hypot(mdx, mdy) || 1;
+      drawCompactAngleTag(
+        ctx,
+        mainMidX - (mdy / mlen) * 16,
+        mainMidY + (mdx / mlen) * 16,
+        `Main ${geo.mainAngleDeg.toFixed(1)}°`,
+        "#f59e0b"
+      );
+
+      if (state.jibLength > 0) {
+        const jibTipX = toX(geo.activeTipX);
+        const jibTipY = toY(geo.activeTipY);
+        const jibArcR = Math.max(20, Math.min(36, 2.4 * scale));
+        ctx.strokeStyle = "rgba(56, 189, 248, 0.9)";
+        ctx.beginPath();
+        ctx.arc(mainTipX, mainTipY, jibArcR, -geo.mainAngleRad, -geo.jibAngleRad, geo.jibAngleRad > geo.mainAngleRad);
+        ctx.stroke();
+
+        const jdx = jibTipX - mainTipX;
+        const jdy = jibTipY - mainTipY;
+        const jlen = Math.hypot(jdx, jdy) || 1;
+        drawCompactAngleTag(
+          ctx,
+          (mainTipX + jibTipX) / 2 - (jdy / jlen) * 16,
+          (mainTipY + jibTipY) / 2 + (jdx / jlen) * 16,
+          `Jib ${geo.jibAngleDeg.toFixed(1)}°`,
+          "#38bdf8"
+        );
+      }
+      ctx.restore();
+    }
+
+    function drawClearanceVector(ctx, c1x, c1y, c2x, c2y, clearanceVal, labelPrefix, isPrimary) {
+      ctx.save();
+      const isBad = clearanceVal < 0.05;
+      const isWarn = clearanceVal < 1.0;
+      const clrColor = isBad ? "#f43f5e" : (isWarn ? "#f59e0b" : "#10b981");
+
+      ctx.strokeStyle = clrColor;
+      ctx.globalAlpha = isPrimary ? 0.9 : 0.45;
+      ctx.lineWidth = isPrimary ? 1.6 : 1.1;
+      ctx.setLineDash(isPrimary ? [4, 3] : [2, 3]);
+      ctx.beginPath();
+      ctx.moveTo(c1x, c1y);
+      ctx.lineTo(c2x, c2y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.globalAlpha = isPrimary ? 1 : 0.55;
+      ctx.fillStyle = clrColor;
+      ctx.beginPath();
+      ctx.arc(c1x, c1y, isPrimary ? 2.5 : 1.8, 0, Math.PI * 2);
+      ctx.arc(c2x, c2y, isPrimary ? 2.5 : 1.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawCraneBody(ctx, toX, toY, scale, geo) {
+      const crane = geo.crane;
+      const gY = toY(0);
+
+      ctx.fillStyle = "#334155";
+      ctx.strokeStyle = "#64748b";
+      ctx.lineWidth = 1.5;
+      const baseHalfW = crane.isLattice ? 4.15 : 4.2;
+      const trackH = Math.max(8, 1.15 * scale);
+      ctx.fillRect(toX(-baseHalfW), gY - trackH, baseHalfW * 2 * scale, trackH);
+      ctx.strokeRect(toX(-baseHalfW), gY - trackH, baseHalfW * 2 * scale, trackH);
+
+      const cabBottom = gY - trackH;
+      const cabH = Math.max(12, (geo.pY - 1.0) * scale);
+      const tailW = crane.tailSwing * scale;
+      const frontW = (geo.pX + 1.0) * scale;
+
+      ctx.fillStyle = "#d97706";
+      ctx.strokeStyle = "#fbbf24";
+      ctx.fillRect(toX(0) - tailW, cabBottom - cabH, tailW + frontW, cabH);
+      ctx.strokeRect(toX(0) - tailW, cabBottom - cabH, tailW + frontW, cabH);
+
+      const cwW = Math.max(10, 1.6 * scale);
+      const cwH = cabH * 1.15;
+      ctx.fillStyle = "#1e293b";
+      ctx.strokeStyle = "#94a3b8";
+      ctx.fillRect(toX(0) - tailW, cabBottom - cwH, cwW, cwH);
+      ctx.strokeRect(toX(0) - tailW, cabBottom - cwH, cwW, cwH);
+
+      ctx.fillStyle = "#f8fafc";
+      ctx.font = "bold 9px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${state.cwWeight}t`, toX(0) - tailW + cwW / 2, cabBottom - cwH - 4);
+    }
+
+    function drawBoomSegmentWithTrueDepth(ctx, x1, y1, x2, y2, depthPx, isLattice, strokeColor, chordColor, isJib) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const len = Math.hypot(dx, dy);
+      const angle = Math.atan2(dy, dx);
+      const visualDepth = Math.max(4, depthPx);
+
+      ctx.save();
+      ctx.translate(x1, y1);
+      ctx.rotate(angle);
+
+      if (!isLattice && !isJib) {
+        ctx.fillStyle = "rgba(245, 158, 11, 0.25)";
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -visualDepth / 2);
+        ctx.lineTo(len, -visualDepth * 0.42);
+        ctx.lineTo(len, visualDepth * 0.42);
+        ctx.lineTo(0, visualDepth / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = isJib ? "rgba(56, 189, 248, 0.09)" : "rgba(245, 158, 11, 0.09)";
+        ctx.fillRect(0, -visualDepth / 2, len, visualDepth);
+
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = isJib ? 1.1 : 1.3;
+        const step = Math.max(9, visualDepth * 1.15);
+        ctx.beginPath();
+        for (let d = 0; d < len; d += step) {
+          const nextD = Math.min(len, d + step);
+          ctx.moveTo(d, -visualDepth / 2);
+          ctx.lineTo(nextD, visualDepth / 2);
+          ctx.moveTo(nextD, -visualDepth / 2);
+          ctx.lineTo(d, visualDepth / 2);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = chordColor;
+        ctx.lineWidth = isJib ? 1.8 : 2.2;
+        ctx.beginPath();
+        ctx.moveTo(0, -visualDepth / 2);
+        ctx.lineTo(len, -visualDepth / 2);
+        ctx.moveTo(0, visualDepth / 2);
+        ctx.lineTo(len, visualDepth / 2);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = chordColor;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(3, visualDepth * 0.25), 0, Math.PI * 2);
+      ctx.arc(len, 0, Math.max(3, visualDepth * 0.25), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function setupCanvasDrag() {
+      const canvas = document.getElementById("simCanvas");
+
+      const getMouseMeters = (evt) => {
+        const rect = canvas.getBoundingClientRect();
+        const src = evt.touches && evt.touches[0] ? evt.touches[0] : evt;
+        const px = src.clientX - rect.left;
+        const py = src.clientY - rect.top;
+        const mX = (px - canvasView.originX) / canvasView.scale;
+        const mY = (canvasView.originY - py) / canvasView.scale;
+        return { mX, mY };
+      };
+
+      const isOverLoad = (mX, mY, geo) => (
+        mX >= geo.loadLeftX - 0.5 &&
+        mX <= geo.loadRightX + 0.5 &&
+        mY >= geo.loadBottomY - 0.5 &&
+        mY <= geo.loadTopY + 0.5
+      );
+
+      const onDown = (evt) => {
+        const { mX, mY } = getMouseMeters(evt);
+        const geo = solveCraneGeometryAndCollision();
+        if (!isOverLoad(mX, mY, geo)) return;
+        const cx = (geo.loadLeftX + geo.loadRightX) / 2;
+        const cy = (geo.loadBottomY + geo.loadTopY) / 2;
+        loadDragGrab = { dx: mX - cx, dy: mY - cy };
+        state.isDraggingLoad = true;
+        canvas.style.cursor = "grabbing";
+        if (canvas.setPointerCapture && evt.pointerId != null) {
+          try { canvas.setPointerCapture(evt.pointerId); } catch (e) {}
+        }
+        evt.preventDefault();
+      };
+
+      const onMove = (evt) => {
+        const { mX, mY } = getMouseMeters(evt);
+        if (!state.isDraggingLoad) {
+          const geo = solveCraneGeometryAndCollision();
+          canvas.style.cursor = isOverLoad(mX, mY, geo) ? "grab" : "crosshair";
+          return;
+        }
+        evt.preventDefault();
+        const geo = solveCraneGeometryAndCollision();
+        const targetX = mX - loadDragGrab.dx;
+        const targetY = mY - loadDragGrab.dy;
+        const newR = Math.round(Math.max(geo.minRadius, Math.min(geo.maxRadius, targetX)) * 2) / 2;
+        const maxElev = Math.max(0, geo.activeSheaveY - geo.slingH - geo.hookObj.height - state.loadHeight - 0.4);
+        const newElev = Math.round(Math.max(0, Math.min(maxElev, targetY - state.loadHeight / 2)) * 2) / 2;
+
+        if (Math.abs(newR - state.workingRadius) < 0.01 && Math.abs(newElev - state.loadBottomElevation) < 0.01) return;
+
+        state.workingRadius = newR;
+        state.loadBottomElevation = newElev;
+        document.getElementById("radiusSlider").value = newR;
+        document.getElementById("radiusNum").value = newR;
+        document.getElementById("loadHeightSlider").value = newElev;
+        document.getElementById("loadHeightNum").value = newElev;
+        updateAll();
+      };
+
+      const onUp = () => {
+        state.isDraggingLoad = false;
+        canvas.style.cursor = "crosshair";
+      };
+
+      canvas.addEventListener("pointerdown", onDown);
+      canvas.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+      window.addEventListener("pointercancel", onUp);
+    }
+
+    function getStandardRadiiForCrane(crane, minR, maxR) {
+      const radii = [];
+      const candidates = [3.5, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0, 36.0, 38.0, 40.0, 44.0, 48.0, 52.0, 56.0, 60.0];
+      candidates.forEach(r => {
+        if (r >= minR && r <= maxR) radii.push(r);
+      });
+      if (!radii.some(r => Math.abs(r - state.workingRadius) < 0.1)) {
+        radii.push(state.workingRadius);
+        radii.sort((a, b) => a - b);
+      }
+      return radii;
+    }
+
+    function renderLoadChartTable(geo) {
+      document.getElementById("tableLoadWeightHeader").textContent = state.loadWeight.toFixed(1);
+      const tbody = document.getElementById("loadChartTableBody");
+      tbody.innerHTML = "";
+
+      const crane = geo.crane;
+      const deduct = Math.round((geo.hookObj.weight + state.riggingWeight) * 100) / 100;
+      const radii = getStandardRadiiForCrane(crane, geo.minRadius, geo.maxRadius);
+
+      const offsetRad = (state.jibOffset * Math.PI) / 180;
+      const effX = state.mainBoom + state.jibLength * Math.cos(offsetRad);
+      const effY = state.jibLength * Math.sin(offsetRad);
+      const L_eff = Math.hypot(effX, effY);
+      const gamma = Math.atan2(effY, effX);
+
+      radii.forEach(r => {
+        const gross = getCraneGrossCapacity(crane, state.mainBoom, state.jibLength, state.jibOffset, state.cwWeight, r);
+        const cappedGross = Math.min(gross, geo.hookObj.capacity);
+        const net = Math.max(0, Math.round((cappedGross - deduct) * 100) / 100);
+
+        const cosVal = Math.max(-0.999, Math.min(0.999, (r - crane.pivotOffsetX) / L_eff));
+        const mainRad = Math.acos(cosVal) + gamma;
+        const mainDeg = (mainRad * 180) / Math.PI;
+        const tipH = crane.pivotHeightY + state.mainBoom * Math.sin(mainRad) + state.jibLength * Math.sin(mainRad - offsetRad);
+
+        const isCurrent = Math.abs(r - state.workingRadius) < 0.15;
+        const canLift = net >= state.loadWeight && cappedGross > 0;
+
+        const tr = document.createElement("tr");
+        tr.className = isCurrent
+          ? "bg-amber-500/20 border-l-4 border-l-amber-400 font-semibold"
+          : "hover:bg-slate-800/60 transition";
+
+        tr.innerHTML = `
+          <td class="py-1.5 px-3 ${isCurrent ? 'text-amber-300 font-bold' : 'text-slate-200'}">
+            ${r.toFixed(1)} m ${isCurrent ? '<span class="ml-1 text-[10px] px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 font-bold">當前</span>' : ''}
+          </td>
+          <td class="py-1.5 px-3 text-slate-300">${mainDeg.toFixed(1)}°</td>
+          <td class="py-1.5 px-3 text-slate-300">${tipH.toFixed(1)} m</td>
+          <td class="py-1.5 px-3 text-amber-400 font-semibold">${cappedGross > 0 ? cappedGross.toFixed(1) + ' t' : '--'}</td>
+          <td class="py-1.5 px-3 text-slate-400">-${deduct.toFixed(2)} t</td>
+          <td class="py-1.5 px-3 font-bold ${canLift ? 'text-cyan-400' : 'text-rose-400'}">${cappedGross > 0 ? net.toFixed(2) + ' t' : '0.00 t'}</td>
+          <td class="py-1.5 px-3">
+            ${canLift
+              ? `<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px]">✓ 可吊 (+${(net - state.loadWeight).toFixed(1)}t)</span>`
+              : `<span class="px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px]">✕ 超載 (${(net - state.loadWeight).toFixed(1)}t)</span>`
+            }
+          </td>
+          <td class="py-1.5 px-3 text-right">
+            <button type="button" onclick="selectRadiusFromTable(${r})" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-amber-500 hover:text-slate-950 text-slate-300 text-[10px] transition">
+              套用
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderInlineMatrix(geo) {
+      const crane = geo.crane;
+      const table = document.getElementById("inlineMatrixTable");
+      const booms = crane.mainBooms;
+      const allRadii = [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40, 44, 48];
+      const deduct = Math.round((geo.hookObj.weight + state.riggingWeight) * 100) / 100;
+
+      let html = `<thead class="bg-slate-950 text-slate-300 sticky top-0 z-10 border-b border-slate-800"><tr>
+        <th class="py-2 px-2.5 text-left bg-slate-950 sticky left-0 z-20 border-r border-slate-800">半徑 \\ 主臂</th>`;
+      booms.forEach(b => {
+        const isCurBoom = Math.abs(b - state.mainBoom) < 0.1;
+        html += `<th class="py-2 px-2.5 ${isCurBoom ? 'bg-amber-500/20 text-amber-300 font-bold' : ''}">${b}m</th>`;
+      });
+      html += `</tr></thead><tbody class="divide-y divide-slate-800/70">`;
+
+      allRadii.forEach(r => {
+        const isCurRad = Math.abs(r - state.workingRadius) < 0.6;
+        html += `<tr class="${isCurRad ? 'bg-amber-500/10' : 'hover:bg-slate-800/40'}">
+          <td class="py-1.5 px-2.5 text-left font-bold bg-slate-950 sticky left-0 z-10 border-r border-slate-800 ${isCurRad ? 'text-amber-400' : 'text-slate-300'}">${r.toFixed(1)}m</td>`;
+
+        booms.forEach(b => {
+          const gross = getCraneGrossCapacity(crane, b, state.jibLength, state.jibOffset, state.cwWeight, r);
+          const isSelectedCell = Math.abs(b - state.mainBoom) < 0.1 && Math.abs(r - state.workingRadius) < 0.6;
+          if (gross <= 0) {
+            html += `<td class="py-1.5 px-2 text-slate-600">--</td>`;
+          } else {
+            const net = Math.max(0, gross - deduct);
+            const canLift = net >= state.loadWeight;
+            html += `<td onclick="applyMatrixCell('${crane.id}', ${b}, ${r})" class="py-1.5 px-2 cursor-pointer matrix-cell transition ${
+              isSelectedCell
+                ? 'bg-amber-500 text-slate-950 font-black'
+                : (canLift ? 'text-emerald-300 hover:bg-emerald-500/20' : 'text-rose-400/80 hover:bg-rose-500/20')
+            }" title="點擊套用：主臂 ${b}m / 半徑 ${r}m (Gross: ${gross.toFixed(1)}t, Net: ${net.toFixed(1)}t)">${gross.toFixed(1)}</td>`;
+          }
+        });
+        html += `</tr>`;
+      });
+      html += `</tbody>`;
+      table.innerHTML = html;
+    }
+
+    function selectRadiusFromTable(r) {
+      state.workingRadius = r;
+      document.getElementById("radiusSlider").value = r;
+      document.getElementById("radiusNum").value = r;
+      updateAll();
+    }
+
+    function switchChartTab(tab) {
+      state.chartTab = tab;
+      const tBtn = document.getElementById("tabTableBtn");
+      const mBtn = document.getElementById("tabMatrixBtn");
+      const cBtn = document.getElementById("tabCurveBtn");
+      const tBox = document.getElementById("loadTableContainer");
+      const mBox = document.getElementById("inlineMatrixContainer");
+      const cBox = document.getElementById("loadCurveContainer");
+
+      tBtn.className = "px-3 py-1 rounded-md text-slate-400 hover:text-white transition";
+      mBtn.className = "px-3 py-1 rounded-md text-slate-400 hover:text-white transition";
+      cBtn.className = "px-3 py-1 rounded-md text-slate-400 hover:text-white transition";
+      tBox.classList.add("hidden");
+      mBox.classList.add("hidden");
+      cBox.classList.add("hidden");
+
+      if (tab === "table") {
+        tBtn.className = "px-3 py-1 rounded-md bg-amber-500 text-slate-950 font-semibold transition";
+        tBox.classList.remove("hidden");
+      } else if (tab === "matrix") {
+        mBtn.className = "px-3 py-1 rounded-md bg-amber-500 text-slate-950 font-semibold transition";
+        mBox.classList.remove("hidden");
+        renderInlineMatrix(solveCraneGeometryAndCollision());
+      } else {
+        cBtn.className = "px-3 py-1 rounded-md bg-amber-500 text-slate-950 font-semibold transition";
+        cBox.classList.remove("hidden");
+        drawCapacityCurve();
+      }
+    }
+
+    function drawCapacityCurve(geoData) {
+      const geo = geoData || solveCraneGeometryAndCollision();
+      const canvas = document.getElementById("curveCanvas");
+      if (!canvas || canvas.offsetParent === null) return;
+
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = (rect.width - 16) * dpr;
+      canvas.height = (rect.height - 16) * dpr;
+
+      const ctx = canvas.getContext("2d");
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const W = rect.width - 16;
+      const H = rect.height - 16;
+      ctx.clearRect(0, 0, W, H);
+
+      const padL = 48, padR = 24, padT = 20, padB = 30;
+      const plotW = W - padL - padR;
+      const plotH = H - padT - padB;
+
+      const points = [];
+      let maxCapPlot = Math.max(geo.totalDeductedLoad * 1.3, 20);
+      for (let r = geo.minRadius; r <= geo.maxRadius; r += 1) {
+        const gross = Math.min(
+          getCraneGrossCapacity(geo.crane, state.mainBoom, state.jibLength, state.jibOffset, state.cwWeight, r),
+          geo.hookObj.capacity
+        );
+        if (gross > maxCapPlot) maxCapPlot = gross;
+        points.push({ r, gross });
+      }
+      maxCapPlot = Math.ceil(maxCapPlot / 10) * 10;
+
+      const xPx = (r) => padL + ((r - geo.minRadius) / Math.max(1, geo.maxRadius - geo.minRadius)) * plotW;
+      const yPx = (c) => padT + plotH - (c / maxCapPlot) * plotH;
+
+      ctx.strokeStyle = "#1e293b";
+      ctx.fillStyle = "#64748b";
+      ctx.font = "10px 'JetBrains Mono', monospace";
+      for (let i = 0; i <= 4; i++) {
+        const val = (maxCapPlot / 4) * i;
+        const y = yPx(val);
+        ctx.beginPath();
+        ctx.moveTo(padL, y);
+        ctx.lineTo(W - padR, y);
+        ctx.stroke();
+        ctx.textAlign = "right";
+        ctx.fillText(`${val.toFixed(0)}t`, padL - 6, y + 3);
+      }
+
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      points.forEach((pt, idx) => {
+        if (idx === 0) ctx.moveTo(xPx(pt.r), yPx(pt.gross));
+        else ctx.lineTo(xPx(pt.r), yPx(pt.gross));
+      });
+      ctx.stroke();
+
+      const loadY = yPx(geo.totalDeductedLoad);
+      ctx.strokeStyle = "#38bdf8";
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(padL, loadY);
+      ctx.lineTo(W - padR, loadY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const curX = xPx(state.workingRadius);
+      const curY = yPx(geo.effectiveRatedCap);
+      ctx.fillStyle = geo.utilizationPct > 100 ? "#f43f5e" : "#10b981";
+      ctx.beginPath();
+      ctx.arc(curX, curY, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function openLoadChartExplorer() {
+      const modal = document.getElementById("loadChartModal");
+      modal.classList.remove("hidden");
+
+      fillBrandAndModelSelects(
+        document.getElementById("explorerBrandSelect"),
+        document.getElementById("explorerCraneSelect"),
+        state.craneId
+      );
+
+      syncExplorerFiltersFromCrane(state.craneId, true);
+      renderExplorerMatrix();
+    }
+
+    function closeLoadChartExplorer() {
+      document.getElementById("loadChartModal").classList.add("hidden");
+    }
+
+    function onExplorerBrandChange() {
+      const brand = document.getElementById("explorerBrandSelect").value;
+      const models = cranesForBrand(brand);
+      fillModelSelect(document.getElementById("explorerCraneSelect"), brand, models[0] && models[0].id);
+      onExplorerCraneChange();
+    }
+
+    function onExplorerCraneChange() {
+      const craneId = document.getElementById("explorerCraneSelect").value;
+      syncExplorerFiltersFromCrane(craneId, false);
+      renderExplorerMatrix();
+    }
+
+    function onExplorerJibChange() {
+      const craneId = document.getElementById("explorerCraneSelect").value;
+      const crane = CRANE_DB[craneId];
+      const jibLen = parseFloat(document.getElementById("explorerJibSelect").value);
+      const jibObj = crane.jibs.find(j => Math.abs(j.length - jibLen) < 0.1) || crane.jibs[0];
+
+      const offSel = document.getElementById("explorerOffsetSelect");
+      offSel.innerHTML = "";
+      jibObj.offsets.forEach(ang => {
+        const opt = document.createElement("option");
+        opt.value = ang;
+        opt.textContent = jibObj.length === 0 ? "0° (主臂直吊)" : `${ang}° 傾角`;
+        offSel.appendChild(opt);
+      });
+      offSel.disabled = jibObj.length === 0;
+      renderExplorerMatrix();
+    }
+
+    function syncExplorerFiltersFromCrane(craneId, matchCurrentState) {
+      const crane = CRANE_DB[craneId];
+
+      const cwSel = document.getElementById("explorerCwSelect");
+      cwSel.innerHTML = "";
+      crane.counterweights.forEach(cw => {
+        const opt = document.createElement("option");
+        opt.value = cw.weight;
+        opt.textContent = cw.name;
+        if (matchCurrentState && Math.abs(cw.weight - state.cwWeight) < 0.1) opt.selected = true;
+        cwSel.appendChild(opt);
+      });
+
+      const jibSel = document.getElementById("explorerJibSelect");
+      jibSel.innerHTML = "";
+      crane.jibs.forEach(j => {
+        const opt = document.createElement("option");
+        opt.value = j.length;
+        opt.textContent = j.name;
+        if (matchCurrentState && Math.abs(j.length - state.jibLength) < 0.1) opt.selected = true;
+        jibSel.appendChild(opt);
+      });
+
+      const jibLen = parseFloat(jibSel.value);
+      const jibObj = crane.jibs.find(j => Math.abs(j.length - jibLen) < 0.1) || crane.jibs[0];
+      const offSel = document.getElementById("explorerOffsetSelect");
+      offSel.innerHTML = "";
+      jibObj.offsets.forEach(ang => {
+        const opt = document.createElement("option");
+        opt.value = ang;
+        opt.textContent = jibObj.length === 0 ? "0° (主臂直吊)" : `${ang}° 傾角`;
+        if (matchCurrentState && ang === state.jibOffset) opt.selected = true;
+        offSel.appendChild(opt);
+      });
+      offSel.disabled = jibObj.length === 0;
+    }
+
+    function renderExplorerMatrix() {
+      const craneId = document.getElementById("explorerCraneSelect").value;
+      const crane = CRANE_DB[craneId];
+      const cwWeight = parseFloat(document.getElementById("explorerCwSelect").value);
+      const jibLen = parseFloat(document.getElementById("explorerJibSelect").value);
+      const jibOffset = parseFloat(document.getElementById("explorerOffsetSelect").value);
+      const mode = document.getElementById("explorerValueMode").value;
+
+      document.getElementById("explorerFooterCargo").textContent = state.loadWeight.toFixed(1);
+
+      const defaultHook = crane.hooks[0];
+      const deduct = Math.round((defaultHook.weight + state.riggingWeight) * 100) / 100;
+
+      document.getElementById("explorerSpecBanner").innerHTML = `
+        <div class="flex items-center gap-4 flex-wrap">
+          <span><b class="text-amber-400">型號:</b> ${crane.name}</span>
+          <span><b class="text-cyan-400">最大額定吊重:</b> ${crane.maxCap} t</span>
+          <span><b class="text-amber-300">主臂截面:</b> ${crane.boomWidth || 1.66}m | <b class="text-sky-300">副臂截面:</b> ${crane.jibWidth || 0.95}m</span>
+          <span><b class="text-purple-400">工作仰角:</b> ${crane.minAngle}° – ${crane.maxAngle}°</span>
+        </div>
+        <div class="text-slate-400">
+          ${mode === "net" ? `已扣除預設吊鈎 (${defaultHook.weight}t) + 索具 (${state.riggingWeight}t) = -${deduct}t` : `顯示原廠額定總吊重 Gross SWL (未扣吊鈎及索具)`}
+        </div>
+      `;
+
+      const jibObj = crane.jibs.find(j => Math.abs(j.length - jibLen) < 0.1) || crane.jibs[0];
+      const booms = crane.mainBooms.filter(b => !jibObj.maxMainBoom || b <= jibObj.maxMainBoom);
+      const allRadii = [3.8, 4.0, 4.5, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 34.0, 36.0, 38.0, 40.0, 44.0, 48.0, 52.0];
+
+      const table = document.getElementById("explorerMatrixTable");
+      let html = `<thead class="bg-slate-950 text-slate-200 sticky top-0 z-20 border-b border-slate-700">
+        <tr>
+          <th class="py-2.5 px-3 text-left bg-slate-950 sticky left-0 z-30 border-r border-slate-800">工作半徑 (m) \\ 主臂長度</th>`;
+
+      booms.forEach(b => {
+        const isActiveBoom = (craneId === state.craneId && Math.abs(b - state.mainBoom) < 0.1);
+        html += `<th class="py-2.5 px-3 border-r border-slate-800/70 ${isActiveBoom ? 'bg-amber-500/20 text-amber-300 font-bold' : ''}">
+          <div>Main ${b} m</div>
+          ${jibLen > 0 ? `<div class="text-[10px] text-cyan-400 font-normal">+ Jib ${jibLen}m (${jibOffset}°)</div>` : ''}
+        </th>`;
+      });
+      html += `</tr></thead><tbody class="divide-y divide-slate-800/80">`;
+
+      const offsetRad = (jibOffset * Math.PI) / 180;
+
+      allRadii.forEach(r => {
+        let rowHasAnyValue = false;
+        let rowCellsHtml = "";
+
+        booms.forEach(b => {
+          const effX = b + jibLen * Math.cos(offsetRad);
+          const effY = jibLen * Math.sin(offsetRad);
+          const L_eff = Math.hypot(effX, effY);
+          const gamma = Math.atan2(effY, effX);
+
+          const minMainRad = (crane.minAngle * Math.PI) / 180;
+          const maxMainRad = (crane.maxAngle * Math.PI) / 180;
+          const rMin = crane.pivotOffsetX + b * Math.cos(maxMainRad) + jibLen * Math.cos(maxMainRad - offsetRad);
+          const rMax = crane.pivotOffsetX + b * Math.cos(minMainRad) + jibLen * Math.cos(minMainRad - offsetRad);
+
+          const gross = getCraneGrossCapacity(crane, b, jibLen, jibOffset, cwWeight, r);
+
+          if (gross <= 0 || r < rMin - 0.4 || r > rMax + 0.5) {
+            rowCellsHtml += `<td class="py-2 px-2 border-r border-slate-800/50 text-slate-700 bg-slate-950/30">--</td>`;
+          } else {
+            rowHasAnyValue = true;
+            const val = mode === "net" ? Math.max(0, Math.round((gross - deduct) * 10) / 10) : gross;
+            const netForCheck = Math.max(0, gross - deduct);
+            const canLift = netForCheck >= state.loadWeight;
+
+            const cosVal = Math.max(-0.999, Math.min(0.999, (r - crane.pivotOffsetX) / L_eff));
+            const mainRad = Math.acos(cosVal) + gamma;
+            const mainDeg = (mainRad * 180) / Math.PI;
+            const tipH = crane.pivotHeightY + b * Math.sin(mainRad) + jibLen * Math.sin(mainRad - offsetRad);
+
+            const isCurrentSimPoint =
+              craneId === state.craneId &&
+              Math.abs(b - state.mainBoom) < 0.1 &&
+              Math.abs(jibLen - state.jibLength) < 0.1 &&
+              Math.abs(r - state.workingRadius) < 0.3;
+
+            const cellClass = isCurrentSimPoint
+              ? "bg-amber-500 text-slate-950 font-black ring-2 ring-white"
+              : (canLift
+                  ? "bg-emerald-500/10 hover:bg-emerald-500/25 text-emerald-300"
+                  : "bg-rose-500/10 hover:bg-rose-500/20 text-rose-300/90");
+
+            rowCellsHtml += `
+              <td onclick="applyExplorerSelection('${craneId}', ${b}, ${jibLen}, ${jibOffset}, ${cwWeight}, ${r})"
+                  class="py-1.5 px-2 border-r border-slate-800/60 cursor-pointer matrix-cell transition ${cellClass}">
+                <div class="text-xs font-bold">${val.toFixed(1)} <span class="text-[10px] opacity-75">t</span></div>
+                <div class="text-[9px] opacity-75">${mainDeg.toFixed(0)}° | H:${tipH.toFixed(0)}m</div>
+              </td>`;
+          }
+        });
+
+        if (rowHasAnyValue) {
+          const isCurrentRadiusRow = (craneId === state.craneId && Math.abs(r - state.workingRadius) < 0.3);
+          html += `<tr class="hover:bg-slate-800/40">
+            <td class="py-2 px-3 text-left font-bold bg-slate-950 sticky left-0 z-10 border-r border-slate-800 ${isCurrentRadiusRow ? 'text-amber-400' : 'text-slate-200'}">
+              ${r.toFixed(1)} m
+            </td>
+            ${rowCellsHtml}
+          </tr>`;
+        }
+      });
+
+      html += `</tbody>`;
+      table.innerHTML = html;
+    }
+
+    function applyExplorerSelection(craneId, boom, jibLen, jibOffset, cwWeight, radius) {
+      state.craneId = craneId;
+      state.mainBoom = boom;
+      state.jibLength = jibLen;
+      state.jibOffset = jibOffset;
+      state.cwWeight = cwWeight;
+      state.workingRadius = radius;
+
+      populateCraneSelect();
+      syncControlsFromCrane();
+      document.getElementById("mainBoomSelect").value = boom;
+      document.getElementById("jibSelect").value = jibLen;
+      syncJibOffsets();
+      document.getElementById("jibOffsetSelect").value = jibOffset;
+      document.getElementById("cwSelect").value = cwWeight;
+      document.getElementById("radiusSlider").value = radius;
+      document.getElementById("radiusNum").value = radius;
+
+      closeLoadChartExplorer();
+      updateAll();
+    }
+
+    function applyMatrixCell(craneId, boom, radius) {
+      state.craneId = craneId;
+      state.mainBoom = boom;
+      state.workingRadius = radius;
+      populateCraneSelect();
+      document.getElementById("mainBoomSelect").value = boom;
+      document.getElementById("radiusSlider").value = radius;
+      document.getElementById("radiusNum").value = radius;
+      updateAll();
+    }
+
+    let builderDraft = null;
+    let builderRadiiList = [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 26.0, 28.0, 30.0, 32.0, 36.0, 40.0];
+
+    function openCraneBuilderModal(targetCraneId) {
+      document.getElementById("craneBuilderModal").classList.remove("hidden");
+      const idToLoad = targetCraneId || state.craneId;
+      loadCraneIntoBuilder(idToLoad);
+      renderBuilderFleetSidebar();
+      switchBuilderStep(1);
+    }
+
+    function closeCraneBuilderModal() {
+      document.getElementById("craneBuilderModal").classList.add("hidden");
+    }
+
+    function renderBuilderFleetSidebar() {
+      const listEl = document.getElementById("builderFleetList");
+      const cranes = Object.values(CRANE_DB);
+      document.getElementById("fleetCountLabel").textContent = cranes.length;
+      listEl.innerHTML = "";
+
+      listBrands().forEach(brand => {
+        const group = document.createElement("div");
+        group.className = "space-y-1.5";
+        const heading = document.createElement("div");
+        heading.className = "px-1.5 pt-1.5 text-[11px] font-bold tracking-wide text-amber-400";
+        heading.textContent = brand;
+        group.appendChild(heading);
+
+        cranesForBrand(brand).forEach(c => {
+          const isSelected = builderDraft && builderDraft.id === c.id;
+          const isDefault = Boolean(DEFAULT_CRANE_DB[c.id]);
+          const item = document.createElement("div");
+          item.onclick = () => loadCraneIntoBuilder(c.id);
+          item.className = `p-2.5 rounded-xl border cursor-pointer transition flex items-center justify-between gap-2 ${
+            isSelected
+              ? "bg-emerald-500/20 border-emerald-500 text-white"
+              : "bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-300"
+          }`;
+          item.innerHTML = `
+            <div class="min-w-0">
+              <div class="text-xs font-bold truncate">${craneModelLabel(c)}</div>
+              <div class="text-[10px] text-slate-400 mono flex items-center gap-2 mt-0.5">
+                <span>Max: ${c.maxCap}t</span>
+                <span>•</span>
+                <span>主:${c.boomWidth || 1.5}m / 副:${c.jibWidth || 0.9}m</span>
+              </div>
+            </div>
+            <span class="text-[9px] px-1.5 py-0.5 rounded shrink-0 ${isDefault ? 'bg-slate-800 text-slate-400' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'}">
+              ${isDefault ? '內建' : '自訂'}
+            </span>
+          `;
+          group.appendChild(item);
+        });
+        listEl.appendChild(group);
+      });
+    }
+
+    function loadCraneIntoBuilder(craneId) {
+      const src = CRANE_DB[craneId];
+      if (!src) return;
+      builderDraft = structuredClone(src);
+
+      if (!builderDraft.exactCharts) {
+        const primaryCw = String(builderDraft.counterweights[0]?.weight || 30);
+        builderDraft.exactCharts = { [primaryCw]: {} };
+        const defaultRads = [4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40];
+        builderDraft.mainBooms.forEach(b => {
+          builderDraft.exactCharts[primaryCw][b] = {};
+          defaultRads.forEach(r => {
+            const minR = builderDraft.pivotOffsetX + b * Math.cos((builderDraft.maxAngle * Math.PI) / 180);
+            const maxR = builderDraft.pivotOffsetX + b * Math.cos((builderDraft.minAngle * Math.PI) / 180);
+            if (r >= minR - 0.3 && r <= maxR + 0.3) {
+              const cap = getCraneGrossCapacity(src, b, 0, 0, builderDraft.counterweights[0].weight, r);
+              if (cap > 0) builderDraft.exactCharts[primaryCw][b][r] = cap;
+            }
+          });
+        });
+      }
+
+      const cwKey = Object.keys(builderDraft.exactCharts)[0];
+      const radSet = new Set([4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 36, 40]);
+      Object.values(builderDraft.exactCharts[cwKey] || {}).forEach(rMap => {
+        Object.keys(rMap).forEach(r => radSet.add(parseFloat(r)));
+      });
+      builderRadiiList = Array.from(radSet).sort((a, b) => a - b);
+
+      populateBuilderFieldsFromDraft();
+      renderBuilderFleetSidebar();
+    }
+
+    function populateBuilderFieldsFromDraft() {
+      document.getElementById("b_name").value = builderDraft.name || "";
+      document.getElementById("b_brand").value = craneBrand(builderDraft);
+      document.getElementById("b_id").value = builderDraft.id || "";
+      document.getElementById("b_isLattice").value = String(Boolean(builderDraft.isLattice));
+      document.getElementById("b_type").value = builderDraft.type || "Crawler Crane";
+      document.getElementById("b_maxCap").value = builderDraft.maxCap || 100;
+
+      document.getElementById("b_pivotOffsetX").value = builderDraft.pivotOffsetX ?? 1.4;
+      document.getElementById("b_pivotHeightY").value = builderDraft.pivotHeightY ?? 2.7;
+      document.getElementById("b_boomWidth").value = builderDraft.boomWidth ?? 1.66;
+      document.getElementById("b_jibWidth").value = builderDraft.jibWidth ?? 0.95;
+      document.getElementById("b_headOffset").value = builderDraft.headOffset ?? 0.45;
+      document.getElementById("b_tailSwing").value = builderDraft.tailSwing ?? 5.0;
+      document.getElementById("b_minAngle").value = builderDraft.minAngle ?? 15;
+      document.getElementById("b_maxAngle").value = builderDraft.maxAngle ?? 82;
+
+      document.getElementById("b_mainBooms").value = (builderDraft.mainBooms || []).join(", ");
+
+      renderBuilderCwList();
+      renderBuilderHookList();
+      renderBuilderJibList();
+      renderBuilderMatrixEditor();
+    }
+
+    function syncDraftFromStep1And2Inputs() {
+      if (!builderDraft) return;
+      builderDraft.name = document.getElementById("b_name").value.trim() || "未命名吊機";
+      builderDraft.brand = document.getElementById("b_brand").value.trim() || craneBrand({ name: builderDraft.name });
+      const rawId = document.getElementById("b_id").value.trim().toLowerCase().replace(/[^a-z0-9_]/g, "_");
+      builderDraft.id = rawId || ("custom_crane_" + Date.now());
+      builderDraft.isLattice = document.getElementById("b_isLattice").value === "true";
+      builderDraft.type = document.getElementById("b_type").value.trim() || "Custom Crane";
+      builderDraft.maxCap = parseFloat(document.getElementById("b_maxCap").value) || 100;
+
+      builderDraft.pivotOffsetX = parseFloat(document.getElementById("b_pivotOffsetX").value) || 1.4;
+      builderDraft.pivotHeightY = parseFloat(document.getElementById("b_pivotHeightY").value) || 2.7;
+      builderDraft.boomWidth = parseFloat(document.getElementById("b_boomWidth").value) || 1.66;
+      builderDraft.jibWidth = parseFloat(document.getElementById("b_jibWidth").value) || 0.95;
+      builderDraft.headOffset = parseFloat(document.getElementById("b_headOffset").value) || 0.45;
+      builderDraft.tailSwing = parseFloat(document.getElementById("b_tailSwing").value) || 5.0;
+      builderDraft.minAngle = parseFloat(document.getElementById("b_minAngle").value) || 15;
+      builderDraft.maxAngle = parseFloat(document.getElementById("b_maxAngle").value) || 82;
+
+      const parsedBooms = document.getElementById("b_mainBooms").value
+        .split(",")
+        .map(s => parseFloat(s.trim()))
+        .filter(n => !isNaN(n) && n > 3)
+        .sort((a, b) => a - b);
+
+      if (parsedBooms.length > 0) {
+        builderDraft.mainBooms = parsedBooms;
+      }
+    }
+
+    function renderBuilderCwList() {
+      const box = document.getElementById("b_cwList");
+      box.innerHTML = "";
+      (builderDraft.counterweights || []).forEach((cw, idx) => {
+        const row = document.createElement("div");
+        row.className = "grid grid-cols-12 gap-1.5 items-center text-xs";
+        row.innerHTML = `
+          <div class="col-span-3">
+            <input type="number" step="0.1" value="${cw.weight}" onchange="builderDraft.counterweights[${idx}].weight=parseFloat(this.value)||0" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white mono" placeholder="噸數">
+          </div>
+          <div class="col-span-6">
+            <input type="text" value="${cw.name}" onchange="builderDraft.counterweights[${idx}].name=this.value" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white" placeholder="描述名稱">
+          </div>
+          <div class="col-span-2">
+            <input type="number" step="0.05" value="${cw.factor}" onchange="builderDraft.counterweights[${idx}].factor=parseFloat(this.value)||1" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-cyan-300 mono" title="配重能力係數">
+          </div>
+          <div class="col-span-1 text-right">
+            <button type="button" onclick="removeBuilderCwRow(${idx})" class="text-rose-400 hover:text-rose-300 px-1">✕</button>
+          </div>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function addBuilderCwRow() {
+      builderDraft.counterweights.push({ weight: 20.0, name: "20.0 t (附加配重)", factor: 0.85 });
+      renderBuilderCwList();
+    }
+
+    function removeBuilderCwRow(idx) {
+      if (builderDraft.counterweights.length <= 1) return;
+      builderDraft.counterweights.splice(idx, 1);
+      renderBuilderCwList();
+    }
+
+    function renderBuilderHookList() {
+      const box = document.getElementById("b_hookList");
+      box.innerHTML = "";
+      (builderDraft.hooks || []).forEach((hk, idx) => {
+        const row = document.createElement("div");
+        row.className = "grid grid-cols-12 gap-1.5 items-center text-xs";
+        row.innerHTML = `
+          <div class="col-span-5">
+            <input type="text" value="${hk.name}" onchange="builderDraft.hooks[${idx}].name=this.value" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white" placeholder="吊鈎名稱">
+          </div>
+          <div class="col-span-2">
+            <input type="number" step="1" value="${hk.capacity}" onchange="builderDraft.hooks[${idx}].capacity=parseFloat(this.value)||10" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-amber-300 mono" title="上限噸數 (t)">
+          </div>
+          <div class="col-span-2">
+            <input type="number" step="0.05" value="${hk.weight}" onchange="builderDraft.hooks[${idx}].weight=parseFloat(this.value)||0.5" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white mono" title="吊鈎自重 (t)">
+          </div>
+          <div class="col-span-2">
+            <input type="number" step="0.1" value="${hk.height}" onchange="builderDraft.hooks[${idx}].height=parseFloat(this.value)||1.5" class="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-300 mono" title="吊鈎長度 (m)">
+          </div>
+          <div class="col-span-1 text-right">
+            <button type="button" onclick="removeBuilderHookRow(${idx})" class="text-rose-400 hover:text-rose-300 px-1">✕</button>
+          </div>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function addBuilderHookRow() {
+      builderDraft.hooks.push({
+        id: "h_" + Date.now(),
+        name: "50t 標準吊鈎 (0.8t)",
+        capacity: 50,
+        weight: 0.8,
+        height: 1.6
+      });
+      renderBuilderHookList();
+    }
+
+    function removeBuilderHookRow(idx) {
+      if (builderDraft.hooks.length <= 1) return;
+      builderDraft.hooks.splice(idx, 1);
+      renderBuilderHookList();
+    }
+
+    function renderBuilderJibList() {
+      const box = document.getElementById("b_jibList");
+      box.innerHTML = "";
+      (builderDraft.jibs || []).forEach((jb, idx) => {
+        const isZero = jb.length === 0;
+        const row = document.createElement("div");
+        row.className = "grid grid-cols-12 gap-2 items-center text-xs bg-slate-900/60 p-2 rounded-lg border border-slate-800";
+        row.innerHTML = `
+          <div class="col-span-2">
+            <label class="block text-[10px] text-slate-500">副臂長 (m)</label>
+            <input type="number" step="0.5" value="${jb.length}" ${isZero ? 'disabled' : ''} onchange="builderDraft.jibs[${idx}].length=parseFloat(this.value)||0" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white mono">
+          </div>
+          <div class="col-span-4">
+            <label class="block text-[10px] text-slate-500">顯示名稱</label>
+            <input type="text" value="${jb.name}" onchange="builderDraft.jibs[${idx}].name=this.value" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-white">
+          </div>
+          <div class="col-span-3">
+            <label class="block text-[10px] text-slate-500">傾角 (° 逗號分隔)</label>
+            <input type="text" value="${(jb.offsets || [0]).join(', ')}" ${isZero ? 'disabled' : ''} onchange="builderDraft.jibs[${idx}].offsets=this.value.split(',').map(v=>parseFloat(v.trim())).filter(v=>!isNaN(v))" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-purple-300 mono">
+          </div>
+          <div class="col-span-2">
+            <label class="block text-[10px] text-slate-500">最大主臂限制 (m)</label>
+            <input type="number" step="1" value="${jb.maxMainBoom || ''}" ${isZero ? 'disabled' : ''} placeholder="不限" onchange="builderDraft.jibs[${idx}].maxMainBoom=parseFloat(this.value)||undefined" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-slate-300 mono">
+          </div>
+          <div class="col-span-1 text-right pt-3">
+            ${isZero ? '' : `<button type="button" onclick="removeBuilderJibRow(${idx})" class="text-rose-400 hover:text-rose-300 px-1">✕</button>`}
+          </div>
+        `;
+        box.appendChild(row);
+      });
+    }
+
+    function addBuilderJibRow() {
+      builderDraft.jibs.push({
+        length: 15,
+        name: "15m 固定副臂 (Fixed Jib)",
+        offsets: [15, 30],
+        weights: 1.5
+      });
+      renderBuilderJibList();
+    }
+
+    function removeBuilderJibRow(idx) {
+      builderDraft.jibs.splice(idx, 1);
+      renderBuilderJibList();
+    }
+
+    function switchBuilderStep(step) {
+      syncDraftFromStep1And2Inputs();
+      const s1 = document.getElementById("builderStep1");
+      const s2 = document.getElementById("builderStep2");
+      const s3 = document.getElementById("builderStep3");
+      const b1 = document.getElementById("bTab1Btn");
+      const b2 = document.getElementById("bTab2Btn");
+      const b3 = document.getElementById("bTab3Btn");
+
+      s1.classList.add("hidden");
+      s2.classList.add("hidden");
+      s3.classList.add("hidden");
+      b1.className = "px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition";
+      b2.className = "px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition";
+      b3.className = "px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 hover:text-white font-medium transition";
+
+      if (step === 1) {
+        s1.classList.remove("hidden");
+        b1.className = "px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition";
+      } else if (step === 2) {
+        s2.classList.remove("hidden");
+        b2.className = "px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition";
+      } else {
+        s3.classList.remove("hidden");
+        b3.className = "px-3 py-1.5 rounded-lg bg-emerald-500 text-slate-950 font-bold transition";
+        renderBuilderMatrixEditor();
+      }
+    }
+
+    function renderBuilderMatrixEditor() {
+      syncDraftFromStep1And2Inputs();
+      const table = document.getElementById("builderMatrixTable");
+      const cwKey = String(builderDraft.counterweights[0]?.weight || "30.0");
+      if (!builderDraft.exactCharts) builderDraft.exactCharts = {};
+      if (!builderDraft.exactCharts[cwKey]) {
+        const firstExisting = Object.values(builderDraft.exactCharts)[0] || {};
+        builderDraft.exactCharts = { [cwKey]: firstExisting };
+      }
+      const chartObj = builderDraft.exactCharts[cwKey];
+      const booms = builderDraft.mainBooms;
+
+      let html = `<thead class="bg-slate-950 text-slate-200 sticky top-0 z-10 border-b border-slate-700">
+        <tr>
+          <th class="py-2 px-3 text-left bg-slate-950 sticky left-0 z-20 border-r border-slate-800">半徑 (m) \\ 主臂</th>`;
+      booms.forEach(b => {
+        html += `<th class="py-2 px-2 border-r border-slate-800 text-amber-400">${b} m</th>`;
+      });
+      html += `</tr></thead><tbody class="divide-y divide-slate-800">`;
+
+      builderRadiiList.forEach(r => {
+        html += `<tr class="hover:bg-slate-800/40">
+          <td class="py-1.5 px-3 text-left font-bold bg-slate-950 sticky left-0 z-10 border-r border-slate-800 text-slate-300">${r.toFixed(1)} m</td>`;
+
+        booms.forEach(b => {
+          if (!chartObj[b]) chartObj[b] = {};
+          const val = chartObj[b][r] !== undefined ? chartObj[b][r] : "";
+          html += `<td class="p-1 border-r border-slate-800/60">
+            <input type="number" step="0.1" value="${val}" placeholder="--"
+              onchange="updateBuilderCell('${cwKey}', ${b}, ${r}, this.value)"
+              class="w-16 bg-slate-900 border border-slate-700/80 focus:border-amber-400 rounded px-1.5 py-1 text-center text-xs text-white mono focus:outline-none">
+          </td>`;
+        });
+        html += `</tr>`;
+      });
+
+      html += `</tbody>`;
+      table.innerHTML = html;
+    }
+
+    function updateBuilderCell(cwKey, boom, radius, valStr) {
+      if (!builderDraft.exactCharts[cwKey]) builderDraft.exactCharts[cwKey] = {};
+      if (!builderDraft.exactCharts[cwKey][boom]) builderDraft.exactCharts[cwKey][boom] = {};
+      const num = parseFloat(valStr);
+      if (isNaN(num) || num <= 0) {
+        delete builderDraft.exactCharts[cwKey][boom][radius];
+      } else {
+        builderDraft.exactCharts[cwKey][boom][radius] = Math.round(num * 10) / 10;
+      }
+    }
+
+    function autoGenerateLoadChartByFormula() {
+      syncDraftFromStep1And2Inputs();
+      const cwKey = String(builderDraft.counterweights[0]?.weight || "30.0");
+      builderDraft.exactCharts = { [cwKey]: {} };
+      const maxCap = builderDraft.maxCap || 100;
+      const baseMoment = maxCap * 3.85;
+
+      builderDraft.mainBooms.forEach(b => {
+        builderDraft.exactCharts[cwKey][b] = {};
+        const minR = builderDraft.pivotOffsetX + b * Math.cos((builderDraft.maxAngle * Math.PI) / 180);
+        const maxR = builderDraft.pivotOffsetX + b * Math.cos((builderDraft.minAngle * Math.PI) / 180);
+
+        builderRadiiList.forEach(r => {
+          if (r >= minR - 0.4 && r <= maxR + 0.4) {
+            const effR = Math.max(2.5, r - builderDraft.pivotOffsetX);
+            const structuralLimit = maxCap * Math.pow(builderDraft.mainBooms[0] / b, 0.38);
+            const tippingLimit = baseMoment / Math.pow(effR, 1.06) - b * 0.04;
+            const cap = Math.min(maxCap, structuralLimit, tippingLimit);
+            if (cap >= 1.0) {
+              builderDraft.exactCharts[cwKey][b][r] = Math.round(cap * 10) / 10;
+            }
+          }
+        });
+      });
+
+      renderBuilderMatrixEditor();
+    }
+
+    function addCustomRadiusRow() {
+      const rInput = document.getElementById("customRadiusInput");
+      const r = parseFloat(rInput.value);
+      if (!isNaN(r) && r >= 2 && r <= 120) {
+        if (!builderRadiiList.includes(r)) {
+          builderRadiiList.push(r);
+          builderRadiiList.sort((a, b) => a - b);
+          renderBuilderMatrixEditor();
+        }
+        rInput.value = "";
+      }
+    }
+
+    function createNewCraneTemplate() {
+      const newId = "custom_crane_" + Math.floor(100 + Math.random() * 900);
+      CRANE_DB[newId] = {
+        id: newId,
+        name: "Kobelco CKS900 (90t 履帶吊機 - 自訂範例)",
+        brand: "Kobelco",
+        type: "Lattice Boom Crawler Crane",
+        isLattice: true,
+        maxCap: 90,
+        pivotOffsetX: 1.25,
+        pivotHeightY: 2.40,
+        boomWidth: 1.50,
+        jibWidth: 0.85,
+        headOffset: 0.42,
+        tailSwing: 4.60,
+        minAngle: 15,
+        maxAngle: 80,
+        mainBooms: [12, 18, 24, 30, 36, 42, 48, 54],
+        jibs: [
+          { length: 0, name: "無副臂 (Main Boom Only)", offsets: [0], weights: 0 },
+          { length: 12, name: "12m 固定副臂 (Fixed Jib)", offsets: [10, 30], weights: 1.2, maxMainBoom: 48 },
+          { length: 18, name: "18m 固定副臂 (Fixed Jib)", offsets: [10, 30], weights: 1.6, maxMainBoom: 48 }
+        ],
+        counterweights: [
+          { weight: 29.0, name: "29.0 t (標準全配重)", factor: 1.0 },
+          { weight: 20.0, name: "20.0 t (減配重模式)", factor: 0.80 }
+        ],
+        hooks: [
+          { id: "h90", name: "90t 雙滑輪主鈎 (1.10t)", capacity: 90, weight: 1.10, height: 1.9 },
+          { id: "h35", name: "35t 單滑輪吊鈎 (0.65t)", capacity: 35, weight: 0.65, height: 1.5 },
+          { id: "h10", name: "10t 單輪副鈎 (0.30t)", capacity: 10, weight: 0.30, height: 1.1 }
+        ],
+        baseMoment: 330
+      };
+      loadCraneIntoBuilder(newId);
+      autoGenerateLoadChartByFormula();
+      switchBuilderStep(1);
+    }
+
+    function cloneCurrentBuilderCrane() {
+      syncDraftFromStep1And2Inputs();
+      const copy = structuredClone(builderDraft);
+      copy.id = copy.id + "_copy_" + Math.floor(10 + Math.random() * 89);
+      copy.name = copy.name + " (複製修改版)";
+      CRANE_DB[copy.id] = copy;
+      saveCraneDatabaseToStorage();
+      loadCraneIntoBuilder(copy.id);
+    }
+
+    function deleteCurrentBuilderCrane() {
+      if (Object.keys(CRANE_DB).length <= 1) return;
+      const delId = builderDraft.id;
+      delete CRANE_DB[delId];
+      saveCraneDatabaseToStorage();
+      const firstRemaining = Object.keys(CRANE_DB)[0];
+      state.craneId = firstRemaining;
+      populateCraneSelect();
+      syncControlsFromCrane();
+      loadCraneIntoBuilder(firstRemaining);
+      updateAll();
+    }
+
+    function saveBuilderCraneAndApply() {
+      syncDraftFromStep1And2Inputs();
+      CRANE_DB[builderDraft.id] = structuredClone(builderDraft);
+      saveCraneDatabaseToStorage();
+
+      state.craneId = builderDraft.id;
+      populateCraneSelect();
+      syncControlsFromCrane();
+      updateAll();
+      closeCraneBuilderModal();
+    }
+
+    function exportCraneDatabaseJSON() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(CRANE_DB, null, 2));
+      const a = document.createElement("a");
+      a.setAttribute("href", dataStr);
+      a.setAttribute("download", `crane_load_chart_db_${new Date().toISOString().slice(0,10)}.json`);
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    function importCraneDatabaseJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported && typeof imported === "object") {
+            CRANE_DB = { ...CRANE_DB, ...imported };
+            saveCraneDatabaseToStorage();
+            populateCraneSelect();
+            renderBuilderFleetSidebar();
+            const firstImportedId = Object.keys(imported)[0];
+            if (firstImportedId) loadCraneIntoBuilder(firstImportedId);
+          }
+        } catch (err) {
+          console.error("Invalid JSON file:", err);
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function resetDefaultDatabase() {
+      localStorage.removeItem(STORAGE_KEY);
+      CRANE_DB = structuredClone(DEFAULT_CRANE_DB);
+      state.craneId = "liebherr_hs885";
+      populateCraneSelect();
+      syncControlsFromCrane();
+      loadCraneIntoBuilder("liebherr_hs885");
+      updateAll();
+    }
+
+    Object.assign(window, {
+      openCraneBuilderModal,
+      closeCraneBuilderModal,
+      openLoadChartExplorer,
+      closeLoadChartExplorer,
+      setSlingMode,
+      resetView,
+      switchChartTab,
+      selectRadiusFromTable,
+      applyMatrixCell,
+      onExplorerCraneChange,
+      onExplorerJibChange,
+      renderExplorerMatrix,
+      applyExplorerSelection,
+      createNewCraneTemplate,
+      resetDefaultDatabase,
+      switchBuilderStep,
+      cloneCurrentBuilderCrane,
+      deleteCurrentBuilderCrane,
+      saveBuilderCraneAndApply,
+      exportCraneDatabaseJSON,
+      importCraneDatabaseJSON,
+      addBuilderCwRow,
+      removeBuilderCwRow,
+      addBuilderHookRow,
+      removeBuilderHookRow,
+      addBuilderJibRow,
+      removeBuilderJibRow,
+      updateBuilderCell,
+      autoGenerateLoadChartByFormula,
+      addCustomRadiusRow
+    });
+
+    window.addEventListener("DOMContentLoaded", initApp);
+  </script>
+</body>
+</html>
